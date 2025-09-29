@@ -15,9 +15,10 @@ import {
   Zap,
   Shield,
   ArrowRight,
-  Trello,
+  Workflow,
 } from "lucide-react";
 import Navbar from "@/components/navbar";
+import Image from "next/image";
 
 export default function HomePage() {
   const { isSignedIn, user } = useUser();
@@ -39,9 +40,9 @@ export default function HomePage() {
       description: "Built with Next.js 15 for optimal performance",
     },
     {
-      icon: Shield,
-      title: "Secure",
-      description: "Enterprise-grade security with Clerk authentication",
+      icon: Workflow,
+      title: "Connections",
+      description: "Allow objects to inherit information from related sources",
     },
   ];
 
@@ -52,15 +53,15 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Organize work and life,{" "}
+          <h1 className="text-5xl md:text-5xl font-bold text-gray-900 mb-6">
+            Organize SCADA projects,{" "}
             <span className="text-blue-600">finally.</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            TrelloClone helps teams move work forward. Collaborate, manage
-            projects, and reach new productivity peaks. From high rises to the
-            home office, the way your team works is unique—accomplish it all
-            with TrelloClone.
+            Lexicon Flow helps teams move work forward. Collaborate, manage
+            projects, and reach new productivity peaks. Put a stop to wasted
+            time and looking for information. Document it once and reference it
+            forever with Lexicon Flow.
           </p>
 
           {!isSignedIn && (
@@ -119,7 +120,7 @@ export default function HomePage() {
             Ready to get started?
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of teams who are already using TrelloClone to
+            Join the teams who are already using Lexicon Flow to
             organize their work.
           </p>
 
@@ -139,12 +140,11 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <Trello className="h-6 w-6 text-blue-400" />
-              <span className="text-xl font-bold">TrelloClone</span>
+              <Image src="/logo.svg" alt="Logo" width={40} height={40} />
+              <span className="text-xl font-bold">Lexicon Flow</span>
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
-              <span>© 2024 TrelloClone. All rights reserved.</span>
-              <span>Built with Next.js & Clerk</span>
+              <span>Built with Next.js</span>
             </div>
           </div>
         </div>
