@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
+import { SignUpButton, useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +13,6 @@ import {
   CheckSquare,
   Users,
   Zap,
-  Shield,
   ArrowRight,
   Workflow,
 } from "lucide-react";
@@ -21,7 +20,7 @@ import Navbar from "@/components/navbar";
 import Image from "next/image";
 
 export default function HomePage() {
-  const { isSignedIn, user } = useUser();
+  const { isSignedIn } = useUser();
 
   const features = [
     {
@@ -59,8 +58,8 @@ export default function HomePage() {
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Lexicon Flow helps teams move work forward. Collaborate, manage
-            projects, and reach new productivity peaks. Put a stop to wasted
-            time and looking for information. Document it once and reference it
+            projects, and reach new productivity peaks. Put a stop to time
+            wasted looking for information. Document it once and reference it
             forever with Lexicon Flow.
           </p>
 
