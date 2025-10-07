@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/navbar";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function HomePage() {
   const { isSignedIn } = useUser();
@@ -143,7 +144,8 @@ export default function HomePage() {
               <span className="text-xl font-bold">Lexicon Flow</span>
             </div>
             <div className="flex items-center space-x-6 text-sm text-gray-400">
-              <span>Built with Next.js</span>
+              <span>© 2025 Lexicon Flow LLC. All rights reserved.</span>
+              <Link href="/legal/terms">Legal Notices</Link>
             </div>
           </div>
         </div>
