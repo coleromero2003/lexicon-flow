@@ -1,4 +1,14 @@
-import { Board, Column, Task } from "./supabase/models";
+import {
+  Board,
+  Column,
+  Task,
+  Project,
+  Workflow,
+  Step,
+  ScadaObject,
+  LexiconItem,
+  LexiconType,
+} from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const boardService = {
@@ -217,5 +227,155 @@ export const boardDataService = {
     );
 
     return board;
+  },
+};
+
+// --- Project Services ---
+
+export const projectService = {
+  async getProjects(supabase: SupabaseClient): Promise<Project[]> {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getProjectById(supabase: SupabaseClient, id: number): Promise<Project> {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async createProject(
+    supabase: SupabaseClient,
+    project: Omit<Project, "id" | "created_at" | "updated_at">
+  ): Promise<Project> {
+    const { data, error } = await supabase
+      .from("projects")
+      .insert(project)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+};
+
+// --- Workflow Services ---
+export const workflowService = {
+  async getWorkflowsByProject(
+    supabase: SupabaseClient,
+    projectId: number
+  ): Promise<Workflow[]> {
+    const { data, error } = await supabase
+      .from("workflows")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+};
+
+// --- Step Services ---
+export const stepService = {
+  async getStepsByWorkflow(
+    supabase: SupabaseClient,
+    workflowId: number
+  ): Promise<Step[]> {
+    const { data, error } = await supabase
+      .from("steps")
+      .select("*")
+      .eq("workflow_id", workflowId)
+      .order("position", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+};
+
+// --- Object Services ---
+export const objectService = {
+  async getObjectsByProject(
+    supabase: SupabaseClient,
+    projectId: number
+  ): Promise<ScadaObject[]> {
+    const { data, error } = await supabase
+      .from("objects")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getObjectsByWorkflow(
+    supabase: SupabaseClient,
+    workflowId: number
+  ): Promise<ScadaObject[]> {
+    const { data, error } = await supabase
+      .from("objects")
+      .select("*")
+      .eq("workflow_id", workflowId);
+
+    if (error) throw error;
+    return data || [];
+  },
+};
+
+// --- Lexicon Services ---
+export const lexiconService = {
+  async getLexiconItemsByType(
+    supabase: SupabaseClient,
+    orgId: string,
+    type: LexiconType
+  ): Promise<LexiconItem[]> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .select("*")
+      .eq("org_id", orgId)
+      .eq("type", type)
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createLexiconItem(
+    supabase: SupabaseClient,
+    item: Omit<LexiconItem, "id" | "created_at" | "updated_at">
+  ): Promise<LexiconItem> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .insert(item)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+};
+
+// --- Project + Client View ---
+export const projectClientViewService = {
+  async getProjectsWithClients(
+    supabase: SupabaseClient
+  ): Promise<(Project & { client_name: string | null })[]> {
+    const { data, error } = await supabase
+      .from("v_projects_with_client")
+      .select("*");
+
+    if (error) throw error;
+    return data || [];
   },
 };
