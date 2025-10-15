@@ -1,37 +1,59 @@
+// ===== ENUM TYPES =====
+export type ObjectPriority = "low" | "medium" | "high" | "urgent";
+
+export type RelationKind =
+  | "electrical_connection"
+  | "signals_to"
+  | "mechanical"
+  | "references"
+  | "contains"
+  | "depends_on";
+
+export type LexiconType =
+  | "part"
+  | "workflow_template"
+  | "step_template"
+  | "document"
+  | "spec"
+  | "client";
+
+// ===== BOARDS & COLUMNS =====
 export interface Board {
-  id: string;
-  title: string;
+  id: number;
+  created_at: string;
+  updated_at: string;
+  title: string | null;
   description: string | null;
   color: string;
   user_id: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface Column {
-  id: string;
-  board_id: string;
+  id: number;
+  created_at: string;
+  board_id: number;
   title: string;
   sort_order: number;
-  created_at: string;
   user_id: string;
 }
 
-export type ColumnWithTasks = Column & {
-  tasks: Task[];
-};
-
 export interface Task {
-  id: string;
-  column_id: string;
+  id: number;
+  created_at: string;
   title: string;
   description: string | null;
   assignee: string | null;
   due_date: string | null;
   priority: "low" | "medium" | "high";
   sort_order: number;
-  created_at: string;
+  column_id: number | null;
 }
+
+export type ColumnWithTasks = Column & {
+  tasks: Task[];
+};
+
+// ===== PROJECT STRUCTURE =====
 export interface Project {
   id: number;
   created_at: string;
@@ -40,12 +62,13 @@ export interface Project {
   name: string;
   code: string | null;
   description: string | null;
-  status: string; // or enum
+  status: string;
   start_date: string | null;
   end_date: string | null;
   metadata: Record<string, unknown>;
   client_lexicon_id: number | null;
 }
+
 export interface Workflow {
   id: number;
   created_at: string;
@@ -55,6 +78,7 @@ export interface Workflow {
   description: string | null;
   color: string;
 }
+
 export interface Step {
   id: number;
   created_at: string;
@@ -62,28 +86,74 @@ export interface Step {
   title: string;
   position: number;
 }
+
+// ===== OBJECTS =====
 export interface ScadaObject {
   id: number;
   created_at: string;
   updated_at: string;
   project_id: number;
-  workflow_id: number;
-  step_id: number | null;
+  workflow_id: number[] | null;
+  step_id: number[] | null;
   title: string;
   description_md: string | null;
   assignee: string | null;
   due_date: string | null;
-  priority: "low" | "medium" | "high" | "urgent";
+  priority: ObjectPriority;
+  sort_order: number;
+  metadata: Record<string, unknown> | null;
+}
+
+// ===== OBJECT RELATIONS =====
+export interface ObjectRelation {
+  id: number;
+  created_at: string;
+  relation_kind: RelationKind;
+  src_object_id: number;
+  dst_object_id: number;
+}
+
+// ===== OBJECT SUBTASKS =====
+export interface ObjectSubtask {
+  id: number;
+  object_id: number;
+  title: string;
+  is_done: boolean;
   sort_order: number;
 }
-export type LexiconType =
-  | "part"
-  | "workflow_template"
-  | "step_template"
-  | "document"
-  | "spec"
-  | "client";
 
+// ===== FILES =====
+export interface FileMeta {
+  id: number;
+  created_at: string;
+  uploaded_by: string | null;
+  org_id: string;
+  project_id: number | null;
+  storage_key: string;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  sha256: string | null;
+}
+
+// ===== OBJECT-FILE & LEXICON LINKS =====
+export interface ObjectFileLink {
+  object_id: number;
+  file_id: number;
+}
+
+export interface ObjectLexiconLink {
+  object_id: number;
+  lexicon_id: number;
+  note: string | null;
+}
+
+export interface LexiconFileLink {
+  lexicon_id: number;
+  file_id: number;
+}
+
+// ===== LEXICON ITEMS =====
 export interface LexiconItem {
   id: number;
   created_at: string;
@@ -94,4 +164,13 @@ export interface LexiconItem {
   sku: string | null;
   manufacturer: string | null;
   attributes: Record<string, unknown>;
+  version: number;
 }
+
+// ===== AGGREGATE / HELPER TYPES =====
+export type ObjectWithFiles = ScadaObject & { files: FileMeta[] };
+export type ObjectWithSubtasks = ScadaObject & { subtasks: ObjectSubtask[] };
+export type ObjectWithRelations = ScadaObject & {
+  relations: ObjectRelation[];
+};
+export type ObjectWithLexicon = ScadaObject & { lexicon_links: ObjectLexiconLink[] };

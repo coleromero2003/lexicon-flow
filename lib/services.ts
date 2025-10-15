@@ -6,21 +6,28 @@ import {
   Workflow,
   Step,
   ScadaObject,
+  ObjectRelation,
+  ObjectSubtask,
+  ObjectFileLink,
+  ObjectLexiconLink,
+  FileMeta,
+  LexiconFileLink,
   LexiconItem,
   LexiconType,
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
+// =======================
+// BOARD SERVICES
+// =======================
 export const boardService = {
-  async getBoard(supabase: SupabaseClient, boardId: string): Promise<Board> {
+  async getBoard(supabase: SupabaseClient, boardId: number): Promise<Board> {
     const { data, error } = await supabase
       .from("boards")
       .select("*")
       .eq("id", boardId)
       .single();
-
     if (error) throw error;
-
     return data;
   },
 
@@ -30,9 +37,7 @@ export const boardService = {
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-
     if (error) throw error;
-
     return data || [];
   },
 
@@ -45,15 +50,13 @@ export const boardService = {
       .insert(board)
       .select()
       .single();
-
     if (error) throw error;
-
     return data;
   },
 
   async updateBoard(
     supabase: SupabaseClient,
-    boardId: string,
+    boardId: number,
     updates: Partial<Board>
   ): Promise<Board> {
     const { data, error } = await supabase
@@ -62,25 +65,25 @@ export const boardService = {
       .eq("id", boardId)
       .select()
       .single();
-
     if (error) throw error;
     return data;
   },
 };
 
+// =======================
+// COLUMN SERVICES
+// =======================
 export const columnService = {
   async getColumns(
     supabase: SupabaseClient,
-    boardId: string
+    boardId: number
   ): Promise<Column[]> {
     const { data, error } = await supabase
       .from("columns")
       .select("*")
       .eq("board_id", boardId)
       .order("sort_order", { ascending: true });
-
     if (error) throw error;
-
     return data || [];
   },
 
@@ -93,15 +96,13 @@ export const columnService = {
       .insert(column)
       .select()
       .single();
-
     if (error) throw error;
-
     return data;
   },
 
   async updateColumnTitle(
     supabase: SupabaseClient,
-    columnId: string,
+    columnId: number,
     title: string
   ): Promise<Column> {
     const { data, error } = await supabase
@@ -110,135 +111,65 @@ export const columnService = {
       .eq("id", columnId)
       .select()
       .single();
-
     if (error) throw error;
     return data;
   },
 };
 
+// =======================
+// TASK SERVICES
+// =======================
 export const taskService = {
   async getTasksByBoard(
     supabase: SupabaseClient,
-    boardId: string
+    boardId: number
   ): Promise<Task[]> {
     const { data, error } = await supabase
       .from("tasks")
-      .select(
-        `
-        *,
-        columns!inner(board_id)
-        `
-      )
+      .select("*, columns!inner(board_id)")
       .eq("columns.board_id", boardId)
       .order("sort_order", { ascending: true });
-
     if (error) throw error;
-
     return data || [];
   },
 
   async createTask(
     supabase: SupabaseClient,
-    task: Omit<Task, "id" | "created_at" | "updated_at">
+    task: Omit<Task, "id" | "created_at">
   ): Promise<Task> {
     const { data, error } = await supabase
       .from("tasks")
       .insert(task)
       .select()
       .single();
-
     if (error) throw error;
-
     return data;
   },
 
   async moveTask(
     supabase: SupabaseClient,
-    taskId: string,
-    newColumnId: string,
+    taskId: number,
+    newColumnId: number,
     newOrder: number
   ) {
     const { data, error } = await supabase
       .from("tasks")
-      .update({
-        column_id: newColumnId,
-        sort_order: newOrder,
-      })
+      .update({ column_id: newColumnId, sort_order: newOrder })
       .eq("id", taskId);
-
     if (error) throw error;
     return data;
   },
 };
 
-export const boardDataService = {
-  async getBoardWithColumns(supabase: SupabaseClient, boardId: string) {
-    const [board, columns] = await Promise.all([
-      boardService.getBoard(supabase, boardId),
-      columnService.getColumns(supabase, boardId),
-    ]);
-
-    if (!board) throw new Error("Board not found");
-
-    const tasks = await taskService.getTasksByBoard(supabase, boardId);
-
-    const columnsWithTasks = columns.map((column) => ({
-      ...column,
-      tasks: tasks.filter((task) => task.column_id === column.id),
-    }));
-
-    return {
-      board,
-      columnsWithTasks,
-    };
-  },
-
-  async createBoardWithDefaultColumns(
-    supabase: SupabaseClient,
-    boardData: {
-      title: string;
-      description?: string;
-      color?: string;
-      userId: string;
-    }
-  ) {
-    const board = await boardService.createBoard(supabase, {
-      title: boardData.title,
-      description: boardData.description || null,
-      color: boardData.color || "bg-blue-500",
-      user_id: boardData.userId,
-    });
-
-    const defaultColumns = [
-      { title: "To Do", sort_order: 0 },
-      { title: "In Progress", sort_order: 1 },
-      { title: "Review", sort_order: 2 },
-      { title: "Done", sort_order: 3 },
-    ];
-
-    await Promise.all(
-      defaultColumns.map((column) =>
-        columnService.createColumn(supabase, {
-          ...column,
-          board_id: board.id,
-          user_id: boardData.userId,
-        })
-      )
-    );
-
-    return board;
-  },
-};
-
-// --- Project Services ---
-
+// =======================
+// PROJECT SERVICES
+// =======================
 export const projectService = {
   async getProjects(supabase: SupabaseClient): Promise<Project[]> {
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .order("created_at", { ascending: false });
-
     if (error) throw error;
     return data || [];
   },
@@ -249,7 +180,6 @@ export const projectService = {
       .select("*")
       .eq("id", id)
       .single();
-
     if (error) throw error;
     return data;
   },
@@ -263,13 +193,14 @@ export const projectService = {
       .insert(project)
       .select()
       .single();
-
     if (error) throw error;
     return data;
   },
 };
 
-// --- Workflow Services ---
+// =======================
+// WORKFLOW SERVICES
+// =======================
 export const workflowService = {
   async getWorkflowsByProject(
     supabase: SupabaseClient,
@@ -280,13 +211,14 @@ export const workflowService = {
       .select("*")
       .eq("project_id", projectId)
       .order("created_at", { ascending: true });
-
     if (error) throw error;
     return data || [];
   },
 };
 
-// --- Step Services ---
+// =======================
+// STEP SERVICES
+// =======================
 export const stepService = {
   async getStepsByWorkflow(
     supabase: SupabaseClient,
@@ -297,13 +229,14 @@ export const stepService = {
       .select("*")
       .eq("workflow_id", workflowId)
       .order("position", { ascending: true });
-
     if (error) throw error;
     return data || [];
   },
 };
 
-// --- Object Services ---
+// =======================
+// OBJECT SERVICES
+// =======================
 export const objectService = {
   async getObjectsByProject(
     supabase: SupabaseClient,
@@ -314,7 +247,6 @@ export const objectService = {
       .select("*")
       .eq("project_id", projectId)
       .order("sort_order", { ascending: true });
-
     if (error) throw error;
     return data || [];
   },
@@ -326,14 +258,171 @@ export const objectService = {
     const { data, error } = await supabase
       .from("objects")
       .select("*")
-      .eq("workflow_id", workflowId);
-
+      .contains("workflow_id", [workflowId]);
     if (error) throw error;
     return data || [];
   },
+
+  async createObject(
+    supabase: SupabaseClient,
+    obj: Omit<ScadaObject, "id" | "created_at" | "updated_at">
+  ): Promise<ScadaObject> {
+    const { data, error } = await supabase
+      .from("objects")
+      .insert(obj)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };
 
-// --- Lexicon Services ---
+// =======================
+// OBJECT RELATION SERVICES
+// =======================
+export const objectRelationService = {
+  async getRelationsByObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ObjectRelation[]> {
+    const { data, error } = await supabase
+      .from("object_relations")
+      .select("*")
+      .or(`src_object_id.eq.${objectId},dst_object_id.eq.${objectId}`);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createRelation(
+    supabase: SupabaseClient,
+    relation: Omit<ObjectRelation, "id" | "created_at">
+  ): Promise<ObjectRelation> {
+    const { data, error } = await supabase
+      .from("object_relations")
+      .insert(relation)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+};
+
+// =======================
+// OBJECT SUBTASKS
+// =======================
+export const objectSubtaskService = {
+  async getSubtasks(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ObjectSubtask[]> {
+    const { data, error } = await supabase
+      .from("object_subtasks")
+      .select("*")
+      .eq("object_id", objectId)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createSubtask(
+    supabase: SupabaseClient,
+    subtask: Omit<ObjectSubtask, "id">
+  ): Promise<ObjectSubtask> {
+    const { data, error } = await supabase
+      .from("object_subtasks")
+      .insert(subtask)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+};
+
+// =======================
+// FILE SERVICES
+// =======================
+export const fileService = {
+  async getFilesByProject(
+    supabase: SupabaseClient,
+    projectId: number
+  ): Promise<FileMeta[]> {
+    const { data, error } = await supabase
+      .from("files")
+      .select("*")
+      .eq("project_id", projectId);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async uploadFileMeta(
+    supabase: SupabaseClient,
+    file: Omit<FileMeta, "id" | "created_at">
+  ): Promise<FileMeta> {
+    const { data, error } = await supabase
+      .from("files")
+      .insert(file)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+};
+
+// =======================
+// OBJECT-FILE LINKS
+// =======================
+export const objectFileService = {
+  async linkFileToObject(
+    supabase: SupabaseClient,
+    link: ObjectFileLink
+  ): Promise<void> {
+    const { error } = await supabase.from("object_files").insert(link);
+    if (error) throw error;
+  },
+
+  async getFilesForObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<FileMeta[]> {
+    const { data, error } = await supabase
+      .from("object_files")
+      .select("files(*)")
+      .eq("object_id", objectId);
+    if (error) throw error;
+    const typedData = data as { files: FileMeta[] }[] | null;
+    return typedData?.flatMap((r) => r.files) ?? [];
+  },
+};
+
+// =======================
+// OBJECT-LEXICON LINKS
+// =======================
+export const objectLexiconService = {
+  async linkLexiconItem(
+    supabase: SupabaseClient,
+    link: ObjectLexiconLink
+  ): Promise<void> {
+    const { error } = await supabase.from("object_lexicon_links").insert(link);
+    if (error) throw error;
+  },
+
+  async getLexiconForObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<LexiconItem[]> {
+    const { data, error } = await supabase
+      .from("object_lexicon_links")
+      .select("lexicon_items(*)")
+      .eq("object_id", objectId);
+    if (error) throw error;
+    const typedData = data as { lexicon_items: LexiconItem[] }[] | null;
+    return typedData?.flatMap((r) => r.lexicon_items) ?? [];
+  },
+};
+
+// =======================
+// LEXICON SERVICES
+// =======================
 export const lexiconService = {
   async getLexiconItemsByType(
     supabase: SupabaseClient,
@@ -346,7 +435,6 @@ export const lexiconService = {
       .eq("org_id", orgId)
       .eq("type", type)
       .order("name", { ascending: true });
-
     if (error) throw error;
     return data || [];
   },
@@ -360,22 +448,33 @@ export const lexiconService = {
       .insert(item)
       .select()
       .single();
-
     if (error) throw error;
     return data;
   },
 };
 
-// --- Project + Client View ---
-export const projectClientViewService = {
-  async getProjectsWithClients(
-    supabase: SupabaseClient
-  ): Promise<(Project & { client_name: string | null })[]> {
-    const { data, error } = await supabase
-      .from("v_projects_with_client")
-      .select("*");
-
+// =======================
+// LEXICON-FILE LINKS
+// =======================
+export const lexiconFileService = {
+  async linkFileToLexicon(
+    supabase: SupabaseClient,
+    link: LexiconFileLink
+  ): Promise<void> {
+    const { error } = await supabase.from("lexicon_files").insert(link);
     if (error) throw error;
-    return data || [];
+  },
+
+  async getFilesForLexicon(
+    supabase: SupabaseClient,
+    lexiconId: number
+  ): Promise<FileMeta[]> {
+    const { data, error } = await supabase
+      .from("lexicon_files")
+      .select("files(*)")
+      .eq("lexicon_id", lexiconId);
+    if (error) throw error;
+    const typedData = data as { files: FileMeta[] }[] | null;
+    return typedData?.flatMap((r) => r.files) ?? [];
   },
 };
