@@ -864,7 +864,6 @@ describe("Object Subtask Services", () => {
   describe("createSubtask", () => {
     it("should create a subtask for an object", async () => {
       const newSubtask = {
-        id: Date.now(),
         object_id: testObjectId,
         title: "Test Subtask",
         is_done: false,
@@ -887,7 +886,6 @@ describe("Object Subtask Services", () => {
   describe("getSubtasks", () => {
     beforeEach(async () => {
       const subtask = await objectSubtaskService.createSubtask(supabase, {
-        id: Date.now(),
         object_id: testObjectId,
         title: "Subtask 1",
         is_done: false,

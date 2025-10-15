@@ -64,7 +64,7 @@ export default function DashboardPage() {
   }));
 
   const filteredBoards = boardsWithTaskCount.filter((board: Board) => {
-    const matchesSearch = board.title
+    const matchesSearch = board.title?.toString()
       .toLowerCase()
       .includes(filters.search.toLowerCase());
 

@@ -303,6 +303,7 @@ function TaskOverlay({ task }: { task: Task }) {
 
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>();
+  const boardId = parseInt(id, 10);
   const {
     board,
     createColumn,
@@ -312,7 +313,7 @@ export default function BoardPage() {
     setColumns,
     moveTask,
     updateColumn,
-  } = useBoard(id);
+  } = useBoard(boardId);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -414,7 +415,7 @@ export default function BoardPage() {
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const taskId = event.active.id as string;
+    const taskId = Number(event.active.id);
     const task = columns
       .flatMap((col) => col.tasks)
       .find((task) => task.id === taskId);
@@ -428,8 +429,8 @@ export default function BoardPage() {
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeId = Number(active.id);
+    const overId = Number(over.id);
 
     const sourceColumn = columns.find((col) =>
       col.tasks.some((task) => task.id === activeId)
@@ -470,8 +471,8 @@ export default function BoardPage() {
     const { active, over } = event;
     if (!over) return;
 
-    const taskId = active.id as string;
-    const overId = over.id as string;
+    const taskId = Number(active.id);
+    const overId = Number(over.id);
 
     const targetColumn = columns.find((col) => col.id === overId);
     if (targetColumn) {
@@ -567,7 +568,7 @@ export default function BoardPage() {
     <>
       <div className="min-h-screen bg-gray-50">
         <Navbar
-          boardTitle={board?.title}
+          boardTitle={board?.title ?? undefined}
           onEditBoard={() => {
             setNewTitle(board?.title ?? "");
             setNewColor(board?.color ?? "");

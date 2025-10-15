@@ -2,7 +2,6 @@
 
 import { useUser } from "@clerk/nextjs";
 import {
-  boardDataService,
   boardService,
   columnService,
   taskService,
@@ -47,13 +46,27 @@ export function useBoards() {
     if (!user) throw new Error("User not authenticated");
 
     try {
-      const newBoard = await boardDataService.createBoardWithDefaultColumns(
-        supabase!,
-        {
-          ...boardData,
-          userId: user.id,
-        }
+      // Create the board
+      const newBoard = await boardService.createBoard(supabase!, {
+        title: boardData.title,
+        description: boardData.description || null,
+        color: boardData.color || "#3b82f6",
+        user_id: user.id,
+      });
+
+      // Create default columns for the new board
+      const defaultColumns = ["To Do", "In Progress", "Done"];
+      await Promise.all(
+        defaultColumns.map((title, index) =>
+          columnService.createColumn(supabase!, {
+            title,
+            board_id: newBoard.id,
+            sort_order: index,
+            user_id: user.id,
+          })
+        )
       );
+
       setBoards((prev) => [newBoard, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create board.");
@@ -63,7 +76,7 @@ export function useBoards() {
   return { boards, loading, error, createBoard };
 }
 
-export function useBoard(boardId: string) {
+export function useBoard(boardId: number) {
   const { supabase } = useSupabase();
   const { user } = useUser();
 
@@ -84,12 +97,24 @@ export function useBoard(boardId: string) {
     try {
       setLoading(true);
       setError(null);
-      const data = await boardDataService.getBoardWithColumns(
-        supabase!,
-        boardId
-      );
-      setBoard(data.board);
-      setColumns(data.columnsWithTasks);
+
+      // Get board
+      const boardData = await boardService.getBoard(supabase!, boardId);
+      setBoard(boardData);
+
+      // Get columns for this board
+      const columnsData = await columnService.getColumns(supabase!, boardId);
+
+      // Get tasks for this board
+      const tasksData = await taskService.getTasksByBoard(supabase!, boardId);
+
+      // Combine columns with their tasks
+      const columnsWithTasks: ColumnWithTasks[] = columnsData.map((col) => ({
+        ...col,
+        tasks: tasksData.filter((task) => task.column_id === col.id),
+      }));
+
+      setColumns(columnsWithTasks);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load boards.");
     } finally {
@@ -97,7 +122,7 @@ export function useBoard(boardId: string) {
     }
   }
 
-  async function updateBoard(boardId: string, updates: Partial<Board>) {
+  async function updateBoard(boardId: number, updates: Partial<Board>) {
     try {
       const updatedBoard = await boardService.updateBoard(
         supabase!,
@@ -114,7 +139,7 @@ export function useBoard(boardId: string) {
   }
 
   async function createRealTask(
-    columnId: string,
+    columnId: number,
     taskData: {
       title: string;
       description?: string;
@@ -150,8 +175,8 @@ export function useBoard(boardId: string) {
   }
 
   async function moveTask(
-    taskId: string,
-    newColumnId: string,
+    taskId: number,
+    newColumnId: number,
     newOrder: number
   ) {
     try {
@@ -204,7 +229,7 @@ export function useBoard(boardId: string) {
     }
   }
 
-  async function updateColumn(columnId: string, title: string) {
+  async function updateColumn(columnId: number, title: string) {
     try {
       const updatedColumn = await columnService.updateColumnTitle(
         supabase!,
