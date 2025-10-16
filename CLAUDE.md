@@ -4,11 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition) project management application that combines Trello-style task management with advanced SCADA-specific features. Built with Next.js 15, Supabase, Clerk authentication, and dnd-kit for drag-and-drop functionality, the app supports real-time collaboration, organizational workflows, and complex object relationship management.
-
-The application serves dual purposes:
-1. **Simple Task Management**: Trello-style boards with columns and tasks for general project management
-2. **SCADA Project Management**: Advanced workflows, steps, objects, lexicon items, and relationship modeling for industrial control systems
+Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition) project management application built with Next.js 15, Supabase, and Clerk authentication. The app supports real-time collaboration, organizational workflows, and complex object relationship management for industrial control systems.
 
 **Key Technologies:**
 - Next.js 15 with App Router and React 19
@@ -16,7 +12,6 @@ The application serves dual purposes:
 - Clerk for advanced authentication and organization management
 - Vitest for testing
 - TailwindCSS 4 for styling
-- dnd-kit for drag-and-drop interactions
 
 ## Development Commands
 
@@ -48,8 +43,10 @@ supabase stop        # Stop local Supabase instance
 ### Directory Structure
 
 - **`app/`** - Next.js App Router pages and layouts
-  - `boards/[id]/page.tsx` - Main board view with drag-and-drop task management
-  - `dashboard/page.tsx` - User dashboard showing all boards
+  - `dashboard/page.tsx` - User dashboard
+  - `projects/[id]/page.tsx` - Project detail view
+  - `workflows/[id]/page.tsx` - Workflow management
+  - `organization/page.tsx` - Organization management
   - `pricing/page.tsx` - Subscription pricing page
   - `legal/` - Legal documents (terms, privacy, etc.)
 
@@ -58,7 +55,8 @@ supabase stop        # Stop local Supabase instance
   - `supabase/models.ts` - TypeScript type definitions for database entities
   - `supabase/server.ts` - Server-side Supabase client factory
   - `supabase/SupabaseProvider.tsx` - Client-side Supabase context provider
-  - `hooks/useBoards.ts` - React hooks for board and task management
+  - `hooks/useProjects.ts` - React hooks for project management
+  - `hooks/useWorkflows.ts` - React hooks for workflow management
   - `contexts/PlanContext.tsx` - Subscription plan context
 
 - **`components/`** - Reusable UI components
@@ -70,23 +68,22 @@ supabase stop        # Stop local Supabase instance
 
 ### Data Model
 
-The application has two parallel data models:
+The application uses a SCADA-focused data model:
 
-1. **Simple Trello-like Model** (boards/columns/tasks)
-   - `boards` - User boards with title, description, color
-   - `columns` - Columns within boards (To Do, In Progress, Done)
-   - `tasks` - Individual tasks with title, description, assignee, due_date, priority
+**Core Entities:**
+- `projects` - SCADA projects with metadata, organization scoped
+- `workflows` - Workflows within projects
+- `steps` - Individual workflow steps
+- `objects` - SCADA objects (equipment, sensors, etc.) with rich metadata
+- `object_relations` - Relationships between objects (electrical_connection, signals_to, mechanical, references, contains, depends_on)
+- `object_subtasks` - Subtasks for objects
+- `lexicon_items` - Reusable templates (parts, workflow_templates, step_templates, documents, specs, clients)
+- `files` - File metadata with Supabase Storage integration
 
-2. **SCADA Project Model** (projects/workflows/steps/objects)
-   - `projects` - SCADA projects with metadata
-   - `workflows` - Workflows within projects
-   - `steps` - Individual workflow steps
-   - `objects` - SCADA objects (equipment, sensors, etc.) with rich metadata
-   - `object_relations` - Relationships between objects (electrical_connection, signals_to, mechanical, references, contains, depends_on)
-   - `object_subtasks` - Subtasks for objects
-   - `lexicon_items` - Reusable templates (parts, workflow_templates, step_templates, documents, specs, clients)
-   - `files` - File metadata with Supabase Storage integration
-   - Link tables: `object_files`, `object_lexicon_links`, `lexicon_files`
+**Link Tables:**
+- `object_files` - Links files to objects
+- `object_lexicon_links` - Links lexicon items to objects
+- `lexicon_files` - Links files to lexicon items
 
 ### Authentication & Authorization
 
@@ -94,21 +91,16 @@ The application uses a dual authentication system:
 
 - **Clerk** handles user authentication (sign up, login, session management) and organization management
   - Provides `user_id` for individual user authentication
-  - Provides `org_id` for organization-based authorization (SCADA projects)
+  - Provides `org_id` for organization-based authorization
 
 - **Supabase RLS** (Row Level Security) enforces authorization at the database level
-  - `requesting_user_id()` - Helper function to get user ID from JWT claims (for boards/columns/tasks)
-  - `auth_org_id()` - Helper function to get organization ID from JWT claims (for projects/workflows/objects)
-  - **User-based policies**: Boards, columns, and tasks are scoped to individual users
-  - **Organization-based policies**: Projects, workflows, objects, and lexicon items are scoped to organizations
-  - Policies cascade through relationships (e.g., users can access tasks if they own the parent board; organization members can access objects if they belong to an organization's project)
+  - `auth_org_id()` - Helper function to get organization ID from JWT claims
+  - **Organization-based policies**: All data (projects, workflows, objects, lexicon items) are scoped to organizations
+  - Policies cascade through relationships (e.g., organization members can access objects if they belong to an organization's project)
 
 ### Service Layer Pattern
 
 All database interactions go through service functions in `lib/services.ts`:
-- `boardService` - CRUD operations for boards
-- `columnService` - CRUD operations for columns
-- `taskService` - CRUD operations for tasks
 - `projectService` - CRUD operations for projects
 - `workflowService` - Operations for workflows
 - `stepService` - Operations for steps
@@ -126,21 +118,8 @@ Each service function takes a `SupabaseClient` as the first parameter to ensure 
 ### Client-Side State Management
 
 - **SupabaseProvider** wraps the app and provides authenticated Supabase client via `useSupabase()` hook
-- **useBoards()** hook manages loading all boards for current user
-- **useBoard(boardId)** hook manages single board state including:
-  - Board metadata
-  - Columns with their tasks (ColumnWithTasks[])
-  - Real-time optimistic updates for drag-and-drop
-  - CRUD operations for tasks and columns
-
-### Drag-and-Drop Implementation
-
-Uses `@dnd-kit/core` and `@dnd-kit/sortable`:
-- Each column is a `DroppableColumn` (droppable zone)
-- Each task is a `SortableTask` (draggable + sortable within column)
-- `DragOverlay` provides visual feedback during drag
-- Task movement is optimistic (UI updates immediately, then syncs to database)
-- Supports both column-to-column movement and reordering within same column
+- **useProjects()** hook manages loading all projects for current organization
+- **useWorkflows()** hook manages workflows and their steps with real-time updates
 
 ## Environment Variables
 
@@ -243,15 +222,13 @@ Provides deployment and project management tools:
 
 ## Key Features to Remember
 
-1. **Dual Data Models**: User-scoped boards/tasks and organization-scoped SCADA projects
+1. **Organization-scoped data model**: All data is scoped to organizations via Clerk
 2. **Real-time updates** via Supabase subscriptions (infrastructure in place)
 3. **Subscription tiers** (Free/Pro/Enterprise) via Clerk with plan limits
 4. **Cookie consent** notice for GDPR compliance
-5. **Mobile-responsive** board view with horizontal scroll on desktop
-6. **Task filtering** by priority, assignee, and due date
-7. **Customizable** board colors and column titles
-8. **Advanced SCADA features**: Object relationships, lexicon items, file attachments, workflows
-9. **Full-text search** on SCADA objects
-10. **Organization support** via Clerk for team collaboration
-11. **Comprehensive testing** setup with Vitest
-12. **MCP server integration** for enhanced development workflow
+5. **Mobile-responsive** design
+6. **Advanced SCADA features**: Object relationships, lexicon items, file attachments, workflows
+7. **Full-text search** on SCADA objects
+8. **Organization support** via Clerk for team collaboration
+9. **Comprehensive testing** setup with Vitest
+10. **MCP server integration** for enhanced development workflow

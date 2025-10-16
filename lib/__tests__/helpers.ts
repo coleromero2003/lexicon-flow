@@ -8,33 +8,6 @@ export function generateTestId(prefix: string = "test"): string {
 }
 
 /**
- * Helper to create a test board
- */
-export async function createTestBoard(
-  supabase: SupabaseClient,
-  userId: string,
-  overrides?: Partial<{
-    title: string;
-    description: string | null;
-    color: string;
-  }>
-) {
-  const { data, error } = await supabase
-    .from("boards")
-    .insert({
-      title: overrides?.title ?? "Test Board",
-      description: overrides?.description ?? "A test board",
-      color: overrides?.color ?? "#FF0000",
-      user_id: userId,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/**
  * Helper to create a test project
  */
 export async function createTestProject(
@@ -59,33 +32,6 @@ export async function createTestProject(
       end_date: null,
       metadata: {},
       client_lexicon_id: null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Helper to create a test column
- */
-export async function createTestColumn(
-  supabase: SupabaseClient,
-  boardId: number,
-  userId: string,
-  overrides?: Partial<{
-    title: string;
-    sort_order: number;
-  }>
-) {
-  const { data, error } = await supabase
-    .from("columns")
-    .insert({
-      board_id: boardId,
-      title: overrides?.title ?? "Test Column",
-      sort_order: overrides?.sort_order ?? 0,
-      user_id: userId,
     })
     .select()
     .single();
@@ -135,7 +81,7 @@ export async function cleanupTestData(
   supabase: SupabaseClient,
   table: string,
   field: string,
-  value: any
+  value: string | number
 ) {
   const { error } = await supabase.from(table).delete().eq(field, value);
   if (error) {
@@ -177,6 +123,7 @@ export async function createMultipleRecords<T>(
 ): Promise<T[]> {
   const { data, error } = await supabase
     .from(table)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert(records as any)
     .select();
 

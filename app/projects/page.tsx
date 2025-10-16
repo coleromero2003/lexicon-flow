@@ -19,22 +19,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { Project } from "@/lib/supabase/models";
 import { useOrganization } from "@clerk/nextjs";
@@ -46,24 +30,16 @@ import {
   Rocket,
   Search,
   FolderKanban,
-  MoreVertical,
-  Pencil,
-  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-export default function DashboardPage() {
+export default function ProjectsPage() {
   const { organization } = useOrganization();
-  const { createProject, updateProject, deleteProject, projects, error } =
-    useProjects();
+  const { createProject, projects, error } = useProjects();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [isCreatingProject, setIsCreatingProject] = useState<boolean>(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [deletingProjectId, setDeletingProjectId] = useState<number | null>(
-    null
-  );
 
   const [filters, setFilters] = useState({
     search: "",
@@ -105,63 +81,8 @@ export default function DashboardPage() {
     const code = formData.get("code") as string;
 
     if (name.trim()) {
-      try {
-        await createProject({ name, description, code });
-        setIsCreatingProject(false);
-      } catch (err) {
-        console.error("Error creating project:", err);
-        alert(
-          `Failed to create project: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      }
-    }
-  };
-
-  const handleEditProject = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!editingProject) return;
-
-    const formData = new FormData(e.currentTarget);
-    const name = formData.get("name") as string;
-    const description = (formData.get("description") as string) || undefined;
-    const code = (formData.get("code") as string) || undefined;
-    const color = formData.get("color") as string;
-
-    if (name.trim()) {
-      try {
-        await updateProject(editingProject.id, {
-          name,
-          description,
-          code,
-          metadata: { ...editingProject.metadata, color },
-        });
-        setEditingProject(null);
-      } catch (err) {
-        console.error("Error updating project:", err);
-        alert(
-          `Failed to update project: ${
-            err instanceof Error ? err.message : String(err)
-          }`
-        );
-      }
-    }
-  };
-
-  const handleDeleteProject = async () => {
-    if (!deletingProjectId) return;
-
-    try {
-      await deleteProject(deletingProjectId);
-      setDeletingProjectId(null);
-    } catch (err) {
-      console.error("Error deleting project:", err);
-      alert(
-        `Failed to delete project: ${
-          err instanceof Error ? err.message : String(err)
-        }`
-      );
+      await createProject({ name, description, code });
+      setIsCreatingProject(false);
     }
   };
 
@@ -179,21 +100,13 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center py-12">
-            <FolderKanban className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Welcome to Lexicon Flow
+              No Organization Selected
             </h2>
-            <p className="text-gray-600 mb-6">
-              To get started with SCADA project management, you need to create
-              your organization first.
+            <p className="text-gray-600">
+              Please select or create an organization to manage projects.
             </p>
-            <Link href="/organization">
-              <Button size="lg">
-                <Plus className="mr-2 h-5 w-5" />
-                Create Your Organization
-              </Button>
-            </Link>
           </div>
         </main>
       </div>
@@ -345,7 +258,6 @@ export default function DashboardPage() {
               id="search"
               placeholder="Search projects..."
               className="pl-10"
-              value={filters.search}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, search: e.target.value }))
               }
@@ -370,61 +282,20 @@ export default function DashboardPage() {
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProjects.map((project) => (
-                <Card
+                <Link
+                  href={`/projects/${project.id}/workflows`}
                   key={project.id}
-                  className="hover:shadow-lg transition-shadow group relative"
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div
-                        className="w-4 h-4 rounded"
-                        style={{
-                          backgroundColor:
-                            (project.metadata?.color as string) || "#3b82f6",
-                        }}
-                      />
-                      <div className="flex items-center gap-2">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="w-4 h-4 bg-blue-500 rounded" />
                         <Badge className="text-xs" variant="secondary">
                           {project.status}
                         </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingProject(project);
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingProjectId(project.id);
-                              }}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <Link href={`/workflows?projectId=${project.id}`}>
-                    <CardContent className="p-4 sm:p-6 cursor-pointer">
+                    </CardHeader>
+                    <CardContent className="p-4 sm:p-6">
                       <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
                         {project.name}
                       </CardTitle>
@@ -447,8 +318,8 @@ export default function DashboardPage() {
                         </span>
                       </div>
                     </CardContent>
-                  </Link>
-                </Card>
+                  </Card>
+                </Link>
               ))}
 
               <Card
@@ -466,87 +337,43 @@ export default function DashboardPage() {
           ) : (
             <div>
               {filteredProjects.map((project, key) => (
-                <Card
-                  key={key}
-                  className={`hover:shadow-lg transition-shadow group relative ${
-                    key > 0 ? "mt-4" : ""
-                  }`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div
-                        className="w-4 h-4 rounded"
-                        style={{
-                          backgroundColor:
-                            (project.metadata?.color as string) || "#3b82f6",
-                        }}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Badge className="text-xs" variant="secondary">
-                          {project.status}
-                        </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingProject(project);
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingProjectId(project.id);
-                              }}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <Link href={`/workflows?projectId=${project.id}`}>
-                    <CardContent className="p-4 sm:p-6 cursor-pointer">
-                      <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
-                        {project.name}
-                      </CardTitle>
-                      {project.code && (
-                        <Badge variant="outline" className="mb-2">
-                          {project.code}
-                        </Badge>
-                      )}
-                      <CardDescription className="text-sm mb-4">
-                        {project.description || "No description"}
-                      </CardDescription>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500 space-y-1 sm:space-y-0">
-                        <span>
-                          Created{" "}
-                          {new Date(project.created_at).toLocaleDateString()}
-                        </span>
-                        <span>
-                          Updated{" "}
-                          {new Date(project.updated_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </CardContent>
+                <div key={key} className={key > 0 ? "mt-4" : ""}>
+                  <Link href={`/projects/${project.id}/workflows`}>
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="w-4 h-4 bg-blue-500 rounded" />
+                          <Badge className="text-xs" variant="secondary">
+                            {project.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
+                          {project.name}
+                        </CardTitle>
+                        {project.code && (
+                          <Badge variant="outline" className="mb-2">
+                            {project.code}
+                          </Badge>
+                        )}
+                        <CardDescription className="text-sm mb-4">
+                          {project.description || "No description"}
+                        </CardDescription>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500 space-y-1 sm:space-y-0">
+                          <span>
+                            Created{" "}
+                            {new Date(project.created_at).toLocaleDateString()}
+                          </span>
+                          <span>
+                            Updated{" "}
+                            {new Date(project.updated_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </Link>
-                </Card>
+                </div>
               ))}
 
               <Card
@@ -657,7 +484,11 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-2">
               <Label>Project Code</Label>
-              <Input id="code" name="code" placeholder="e.g., PROJ-001" />
+              <Input
+                id="code"
+                name="code"
+                placeholder="e.g., PROJ-001"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
@@ -682,101 +513,6 @@ export default function DashboardPage() {
           </form>
         </DialogContent>
       </Dialog>
-
-      {/* Edit Project Dialog */}
-      <Dialog
-        open={editingProject !== null}
-        onOpenChange={(open) => !open && setEditingProject(null)}
-      >
-        <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <p className="text-sm text-gray-600">
-              Update your SCADA project details
-            </p>
-          </DialogHeader>
-          <form className="space-y-4" onSubmit={handleEditProject}>
-            <div className="space-y-2">
-              <Label>Project Name *</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="Enter project name"
-                defaultValue={editingProject?.name || ""}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Project Code</Label>
-              <Input
-                id="code"
-                name="code"
-                placeholder="e.g., PROJ-001"
-                defaultValue={editingProject?.code || ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Enter project description"
-                defaultValue={editingProject?.description || ""}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Project Color</Label>
-              <Input
-                id="color"
-                name="color"
-                type="color"
-                defaultValue={
-                  (editingProject?.metadata?.color as string) || "#3b82f6"
-                }
-              />
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditingProject(null)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save Changes</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={deletingProjectId !== null}
-        onOpenChange={(open) => !open && setDeletingProjectId(null)}
-      >
-        <AlertDialogContent className="w-[95vw] max-w-[425px] mx-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              project and all its associated workflows, steps, and objects.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingProjectId(null)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteProject}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
