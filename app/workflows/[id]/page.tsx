@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import Navbar from "@/components/navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useBoard } from "@/lib/hooks/useBoards";
-import { ColumnWithTasks, Task } from "@/lib/supabase/models";
+import { useWorkflow } from "@/lib/hooks/useWorkflows";
+import { StepWithObjects, ScadaObject } from "@/lib/supabase/models";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
-import { useParams } from "next/navigation";
+import { Calendar, MoreHorizontal, Plus, User, ArrowLeft } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   DndContext,
@@ -45,18 +46,18 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-function DroppableColumn({
-  column,
+function DroppableStep({
+  step,
   children,
-  onCreateTask,
-  onEditColumn,
+  onCreateObject,
+  onEditStep,
 }: {
-  column: ColumnWithTasks;
+  step: StepWithObjects;
   children: React.ReactNode;
-  onCreateTask: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
-  onEditColumn: (column: ColumnWithTasks) => void;
+  onCreateObject: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  onEditStep: (step: StepWithObjects) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const { setNodeRef, isOver } = useDroppable({ id: step.id });
   return (
     <div
       ref={setNodeRef}
@@ -69,29 +70,29 @@ function DroppableColumn({
           isOver ? "ring-2 ring-blue-300" : ""
         }`}
       >
-        {/* Column Header */}
+        {/* Step Header */}
         <div className="p-3 sm:p-4 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 min-w-0">
               <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
-                {column.title}
+                {step.title}
               </h3>
               <Badge variant="secondary" className="text-xs flex-shrink-0">
-                {column.tasks.length}
+                {step.objects.length}
               </Badge>
             </div>
             <Button
               variant="ghost"
               size="sm"
               className="flex-shrink-0"
-              onClick={() => onEditColumn(column)}
+              onClick={() => onEditStep(step)}
             >
               <MoreHorizontal />
             </Button>
           </div>
         </div>
 
-        {/* column content */}
+        {/* step content */}
         <div className="p-2">
           {children}
           <Dialog>
@@ -101,22 +102,22 @@ function DroppableColumn({
                 className="w-full mt-3 text-gray-500 hover:text-gray-700"
               >
                 <Plus />
-                Add Task
+                Add Object
               </Button>
             </DialogTrigger>
             <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
               <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
-                <p className="text-sm text-gray-600">Add a task to the board</p>
+                <DialogTitle>Create New Object</DialogTitle>
+                <p className="text-sm text-gray-600">Add an object to the workflow</p>
               </DialogHeader>
 
-              <form className="space-y-4" onSubmit={onCreateTask}>
+              <form className="space-y-4" onSubmit={onCreateObject}>
                 <div className="space-y-2">
                   <Label>Title *</Label>
                   <Input
                     id="title"
                     name="title"
-                    placeholder="Enter task title"
+                    placeholder="Enter object title"
                   />
                 </div>
                 <div className="space-y-2">
@@ -124,7 +125,7 @@ function DroppableColumn({
                   <Textarea
                     id="description"
                     name="description"
-                    placeholder="Enter task description"
+                    placeholder="Enter object description"
                     rows={3}
                   />
                 </div>
@@ -133,7 +134,7 @@ function DroppableColumn({
                   <Input
                     id="assignee"
                     name="assignee"
-                    placeholder="Who should do this?"
+                    placeholder="Who should work on this?"
                   />
                 </div>
 
@@ -144,7 +145,7 @@ function DroppableColumn({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["low", "medium", "high"].map((priority, key) => (
+                      {["low", "medium", "high", "urgent"].map((priority, key) => (
                         <SelectItem key={key} value={priority}>
                           {priority.charAt(0).toUpperCase() + priority.slice(1)}
                         </SelectItem>
@@ -159,7 +160,7 @@ function DroppableColumn({
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
-                  <Button type="submit">Create Task</Button>
+                  <Button type="submit">Create Object</Button>
                 </div>
               </form>
             </DialogContent>
@@ -170,7 +171,7 @@ function DroppableColumn({
   );
 }
 
-function SortableTask({ task }: { task: Task }) {
+function SortableObject({ object }: { object: ScadaObject }) {
   const {
     attributes,
     listeners,
@@ -178,7 +179,7 @@ function SortableTask({ task }: { task: Task }) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: object.id });
 
   const styles = {
     transform: CSS.Transform.toString(transform),
@@ -186,8 +187,10 @@ function SortableTask({ task }: { task: Task }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  function getPriorityColor(priority: "low" | "medium" | "high"): string {
+  function getPriorityColor(priority: "low" | "medium" | "high" | "urgent"): string {
     switch (priority) {
+      case "urgent":
+        return "bg-red-600";
       case "high":
         return "bg-red-500";
       case "medium":
@@ -203,37 +206,37 @@ function SortableTask({ task }: { task: Task }) {
       <Card className="cursor-pointer hover:shadow-md transition-shadow">
         <CardContent className="p-3 sm:p-4">
           <div className="space-y-2 sm:space-y-3">
-            {/* Task Header */}
+            {/* Object Header */}
             <div className="flex items-start justify-between">
               <h4 className="font-medium text-gray-900 text-sm leading-tight flex-1 min-w-0 pr-2">
-                {task.title}
+                {object.title}
               </h4>
             </div>
 
-            {/* Task Description */}
+            {/* Object Description */}
             <p className="text-xs text-gray-600 line-clamp-2">
-              {task.description || "No description."}
+              {object.description_md || "No description."}
             </p>
 
-            {/* Task Meta */}
+            {/* Object Meta */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
-                {task.assignee && (
+                {object.assignee && (
                   <div className="flex items-center space-x-1 text-xs text-gray-500">
                     <User className="h-3 w-3" />
-                    <span className="truncate">{task.assignee}</span>
+                    <span className="truncate">{object.assignee}</span>
                   </div>
                 )}
-                {task.due_date && (
+                {object.due_date && (
                   <div className="flex items-center space-x-1 text-xs text-gray-500">
                     <Calendar className="h-3 w-3" />
-                    <span className="truncate">{task.due_date}</span>
+                    <span className="truncate">{object.due_date}</span>
                   </div>
                 )}
               </div>
               <div
                 className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(
-                  task.priority
+                  object.priority
                 )}`}
               />
             </div>
@@ -244,9 +247,11 @@ function SortableTask({ task }: { task: Task }) {
   );
 }
 
-function TaskOverlay({ task }: { task: Task }) {
-  function getPriorityColor(priority: "low" | "medium" | "high"): string {
+function ObjectOverlay({ object }: { object: ScadaObject }) {
+  function getPriorityColor(priority: "low" | "medium" | "high" | "urgent"): string {
     switch (priority) {
+      case "urgent":
+        return "bg-red-600";
       case "high":
         return "bg-red-500";
       case "medium":
@@ -261,37 +266,37 @@ function TaskOverlay({ task }: { task: Task }) {
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
       <CardContent className="p-3 sm:p-4">
         <div className="space-y-2 sm:space-y-3">
-          {/* Task Header */}
+          {/* Object Header */}
           <div className="flex items-start justify-between">
             <h4 className="font-medium text-gray-900 text-sm leading-tight flex-1 min-w-0 pr-2">
-              {task.title}
+              {object.title}
             </h4>
           </div>
 
-          {/* Task Description */}
+          {/* Object Description */}
           <p className="text-xs text-gray-600 line-clamp-2">
-            {task.description || "No description."}
+            {object.description_md || "No description."}
           </p>
 
-          {/* Task Meta */}
+          {/* Object Meta */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
-              {task.assignee && (
+              {object.assignee && (
                 <div className="flex items-center space-x-1 text-xs text-gray-500">
                   <User className="h-3 w-3" />
-                  <span className="truncate">{task.assignee}</span>
+                  <span className="truncate">{object.assignee}</span>
                 </div>
               )}
-              {task.due_date && (
+              {object.due_date && (
                 <div className="flex items-center space-x-1 text-xs text-gray-500">
                   <Calendar className="h-3 w-3" />
-                  <span className="truncate">{task.due_date}</span>
+                  <span className="truncate">{object.due_date}</span>
                 </div>
               )}
             </div>
             <div
               className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(
-                task.priority
+                object.priority
               )}`}
             />
           </div>
@@ -301,30 +306,34 @@ function TaskOverlay({ task }: { task: Task }) {
   );
 }
 
-export default function BoardPage() {
+export default function WorkflowPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get("projectId");
+  const workflowId = parseInt(id, 10);
   const {
-    board,
-    createColumn,
-    updateBoard,
-    columns,
-    createRealTask,
-    setColumns,
-    moveTask,
-    updateColumn,
-  } = useBoard(id);
+    workflow,
+    createStep,
+    updateWorkflow,
+    steps,
+    createRealObject,
+    setSteps,
+    moveObject,
+    updateStep,
+  } = useWorkflow(workflowId);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newColor, setNewColor] = useState("");
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isCreatingColumn, setIsCreatingColumn] = useState(false);
-  const [isEditingColumn, setIsEditingColumn] = useState(false);
+  const [isCreatingStep, setIsCreatingStep] = useState(false);
+  const [isEditingStep, setIsEditingStep] = useState(false);
 
-  const [newColumnTitle, setNewColumnTitle] = useState("");
-  const [editingColumnTitle, setEditingColumnTitle] = useState("");
-  const [editingColumn, setEditingColumn] = useState<ColumnWithTasks | null>(
+  const [newStepTitle, setNewStepTitle] = useState("");
+  const [editingStepTitle, setEditingStepTitle] = useState("");
+  const [editingStep, setEditingStep] = useState<StepWithObjects | null>(
     null
   );
 
@@ -334,7 +343,7 @@ export default function BoardPage() {
     dueDate: null as string | null,
   });
 
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeObject, setActiveObject] = useState<ScadaObject | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -362,49 +371,49 @@ export default function BoardPage() {
     });
   }
 
-  async function handleUpdateBoard(e: React.FormEvent) {
+  async function handleUpdateWorkflow(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!newTitle.trim() || !board) return;
+    if (!newTitle.trim() || !workflow) return;
 
     try {
-      await updateBoard(board.id, {
-        title: newTitle.trim(),
-        color: newColor || board.color,
+      await updateWorkflow(workflow.id, {
+        name: newTitle.trim(),
+        color: newColor || workflow.color,
       });
       setIsEditingTitle(false);
     } catch {}
   }
 
-  async function createTask(taskData: {
+  async function createObject(objectData: {
     title: string;
     description?: string;
     assignee?: string;
     dueDate?: string;
-    priority: "low" | "medium" | "high";
+    priority: "low" | "medium" | "high" | "urgent";
   }) {
-    const targetColumn = columns[0];
-    if (!targetColumn) {
-      throw new Error("No column available to add task");
+    const targetStep = steps[0];
+    if (!targetStep) {
+      throw new Error("No step available to add object");
     }
 
-    await createRealTask(targetColumn.id, taskData);
+    await createRealObject(targetStep.id, objectData);
   }
 
-  async function handleCreateTask(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateObject(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const taskData = {
+    const objectData = {
       title: formData.get("title") as string,
       description: (formData.get("description") as string) || undefined,
       assignee: (formData.get("assignee") as string) || undefined,
       dueDate: (formData.get("dueDate") as string) || undefined,
       priority:
-        (formData.get("priority") as "low" | "medium" | "high") || "medium",
+        (formData.get("priority") as "low" | "medium" | "high" | "urgent") || "medium",
     };
 
-    if (taskData.title.trim()) {
-      await createTask(taskData);
+    if (objectData.title.trim()) {
+      await createObject(objectData);
 
       const trigger = document.querySelector(
         '[data-state="open"]'
@@ -414,13 +423,13 @@ export default function BoardPage() {
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const taskId = event.active.id as string;
-    const task = columns
-      .flatMap((col) => col.tasks)
-      .find((task) => task.id === taskId);
+    const objectId = Number(event.active.id);
+    const object = steps
+      .flatMap((step) => step.objects)
+      .find((obj) => obj.id === objectId);
 
-    if (task) {
-      setActiveTask(task);
+    if (object) {
+      setActiveObject(object);
     }
   }
 
@@ -428,39 +437,39 @@ export default function BoardPage() {
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeId = Number(active.id);
+    const overId = Number(over.id);
 
-    const sourceColumn = columns.find((col) =>
-      col.tasks.some((task) => task.id === activeId)
+    const sourceStep = steps.find((step) =>
+      step.objects.some((obj) => obj.id === activeId)
     );
 
-    const targetColumn = columns.find((col) =>
-      col.tasks.some((task) => task.id === overId)
+    const targetStep = steps.find((step) =>
+      step.objects.some((obj) => obj.id === overId)
     );
 
-    if (!sourceColumn || !targetColumn) return;
+    if (!sourceStep || !targetStep) return;
 
-    if (sourceColumn.id === targetColumn.id) {
-      const activeIndex = sourceColumn.tasks.findIndex(
-        (task) => task.id === activeId
+    if (sourceStep.id === targetStep.id) {
+      const activeIndex = sourceStep.objects.findIndex(
+        (obj) => obj.id === activeId
       );
 
-      const overIndex = targetColumn.tasks.findIndex(
-        (task) => task.id === overId
+      const overIndex = targetStep.objects.findIndex(
+        (obj) => obj.id === overId
       );
 
       if (activeIndex !== overIndex) {
-        setColumns((prev: ColumnWithTasks[]) => {
-          const newColumns = [...prev];
-          const column = newColumns.find((col) => col.id === sourceColumn.id);
-          if (column) {
-            const tasks = [...column.tasks];
-            const [removed] = tasks.splice(activeIndex, 1);
-            tasks.splice(overIndex, 0, removed);
-            column.tasks = tasks;
+        setSteps((prev: StepWithObjects[]) => {
+          const newSteps = [...prev];
+          const step = newSteps.find((s) => s.id === sourceStep.id);
+          if (step) {
+            const objects = [...step.objects];
+            const [removed] = objects.splice(activeIndex, 1);
+            objects.splice(overIndex, 0, removed);
+            step.objects = objects;
           }
-          return newColumns;
+          return newSteps;
         });
       }
     }
@@ -470,91 +479,90 @@ export default function BoardPage() {
     const { active, over } = event;
     if (!over) return;
 
-    const taskId = active.id as string;
-    const overId = over.id as string;
+    const objectId = Number(active.id);
+    const overId = Number(over.id);
 
-    const targetColumn = columns.find((col) => col.id === overId);
-    if (targetColumn) {
-      const sourceColumn = columns.find((col) =>
-        col.tasks.some((task) => task.id === taskId)
+    const targetStep = steps.find((step) => step.id === overId);
+    if (targetStep) {
+      const sourceStep = steps.find((step) =>
+        step.objects.some((obj) => obj.id === objectId)
       );
 
-      if (sourceColumn && sourceColumn.id !== targetColumn.id) {
-        await moveTask(taskId, targetColumn.id, targetColumn.tasks.length);
+      if (sourceStep && sourceStep.id !== targetStep.id) {
+        await moveObject(objectId, targetStep.id, targetStep.objects.length);
       }
     } else {
-      // Check to see if were dropping on another task
-      const sourceColumn = columns.find((col) =>
-        col.tasks.some((task) => task.id === taskId)
+      // Check to see if were dropping on another object
+      const sourceStep = steps.find((step) =>
+        step.objects.some((obj) => obj.id === objectId)
       );
 
-      const targetColumn = columns.find((col) =>
-        col.tasks.some((task) => task.id === overId)
+      const targetStep = steps.find((step) =>
+        step.objects.some((obj) => obj.id === overId)
       );
 
-      if (sourceColumn && targetColumn) {
-        const oldIndex = sourceColumn.tasks.findIndex(
-          (task) => task.id === taskId
+      if (sourceStep && targetStep) {
+        const oldIndex = sourceStep.objects.findIndex(
+          (obj) => obj.id === objectId
         );
 
-        const newIndex = targetColumn.tasks.findIndex(
-          (task) => task.id === overId
+        const newIndex = targetStep.objects.findIndex(
+          (obj) => obj.id === overId
         );
 
         if (oldIndex !== newIndex) {
-          await moveTask(taskId, targetColumn.id, newIndex);
+          await moveObject(objectId, targetStep.id, newIndex);
         }
       }
     }
   }
 
-  async function handleCreateColumn(e: React.FormEvent) {
+  async function handleCreateStep(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!newColumnTitle.trim()) return;
+    if (!newStepTitle.trim()) return;
 
-    await createColumn(newColumnTitle.trim());
+    await createStep(newStepTitle.trim());
 
-    setNewColumnTitle("");
-    setIsCreatingColumn(false);
+    setNewStepTitle("");
+    setIsCreatingStep(false);
   }
 
-  async function handleUpdateColumn(e: React.FormEvent) {
+  async function handleUpdateStep(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!editingColumnTitle.trim() || !editingColumn) return;
+    if (!editingStepTitle.trim() || !editingStep) return;
 
-    await updateColumn(editingColumn.id, editingColumnTitle.trim());
+    await updateStep(editingStep.id, editingStepTitle.trim());
 
-    setEditingColumnTitle("");
-    setIsEditingColumn(false);
-    setEditingColumn(null);
+    setEditingStepTitle("");
+    setIsEditingStep(false);
+    setEditingStep(null);
   }
 
-  function handleEditColumn(column: ColumnWithTasks) {
-    setIsEditingColumn(true);
-    setEditingColumn(column);
-    setEditingColumnTitle(column.title);
+  function handleEditStep(step: StepWithObjects) {
+    setIsEditingStep(true);
+    setEditingStep(step);
+    setEditingStepTitle(step.title);
   }
 
-  const filteredColumns = columns.map((column) => ({
-    ...column,
-    tasks: column.tasks.filter((task) => {
+  const filteredSteps = steps.map((step) => ({
+    ...step,
+    objects: step.objects.filter((obj) => {
       // Filter by priority
       if (
         filters.priority.length > 0 &&
-        !filters.priority.includes(task.priority)
+        !filters.priority.includes(obj.priority)
       ) {
         return false;
       }
 
       // Filter by due date
-
-      if (filters.dueDate && task.due_date) {
-        const taskDate = new Date(task.due_date).toDateString();
+      if (filters.dueDate && obj.due_date) {
+        const objDate = new Date(obj.due_date).toDateString();
         const filterDate = new Date(filters.dueDate).toDateString();
 
-        if (taskDate !== filterDate) {
+        if (objDate !== filterDate) {
           return false;
         }
       }
@@ -567,10 +575,10 @@ export default function BoardPage() {
     <>
       <div className="min-h-screen bg-gray-50">
         <Navbar
-          boardTitle={board?.title}
+          boardTitle={workflow?.name ?? undefined}
           onEditBoard={() => {
-            setNewTitle(board?.title ?? "");
-            setNewColor(board?.color ?? "");
+            setNewTitle(workflow?.name ?? "");
+            setNewColor(workflow?.color ?? "");
             setIsEditingTitle(true);
           }}
           onFilterClick={() => setIsFilterOpen(true)}
@@ -584,45 +592,46 @@ export default function BoardPage() {
         <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
           <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
             <DialogHeader>
-              <DialogTitle>Edit Board</DialogTitle>
+              <DialogTitle>Edit Workflow</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4" onSubmit={handleUpdateBoard}>
+            <form className="space-y-4" onSubmit={handleUpdateWorkflow}>
               <div className="space-y-2">
-                <Label htmlFor="boardTitle">Board Title</Label>
+                <Label htmlFor="workflowTitle">Workflow Name</Label>
                 <Input
-                  id="boardTitle"
+                  id="workflowTitle"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="Enter board title..."
+                  placeholder="Enter workflow name..."
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Board Color</Label>
+                <Label>Workflow Color</Label>
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                   {[
-                    "bg-blue-500",
-                    "bg-green-500",
-                    "bg-yellow-500",
-                    "bg-red-500",
-                    "bg-purple-500",
-                    "bg-pink-500",
-                    "bg-indigo-500",
-                    "bg-gray-500",
-                    "bg-orange-500",
-                    "bg-teal-500",
-                    "bg-cyan-500",
-                    "bg-emerald-500",
+                    "#3b82f6",
+                    "#10b981",
+                    "#f59e0b",
+                    "#ef4444",
+                    "#8b5cf6",
+                    "#ec4899",
+                    "#6366f1",
+                    "#6b7280",
+                    "#f97316",
+                    "#14b8a6",
+                    "#06b6d4",
+                    "#10b981",
                   ].map((color, key) => (
                     <button
                       key={key}
                       type="button"
-                      className={`w-8 h-8 rounded-full ${color} ${
+                      className={`w-8 h-8 rounded-full ${
                         color === newColor
                           ? "ring-2 ring-offset-2 ring-gray-900"
                           : ""
                       } `}
+                      style={{ backgroundColor: color }}
                       onClick={() => setNewColor(color)}
                     />
                   ))}
@@ -646,16 +655,16 @@ export default function BoardPage() {
         <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
           <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
             <DialogHeader>
-              <DialogTitle>Filter Tasks</DialogTitle>
+              <DialogTitle>Filter Objects</DialogTitle>
               <p className="text-sm text-gray-600">
-                Filter tasks by priority, assignee, or due date
+                Filter objects by priority, assignee, or due date
               </p>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Priority</Label>
                 <div className="flex flex-wrap gap-2">
-                  {["low", "medium", "high"].map((priority, key) => (
+                  {["low", "medium", "high", "urgent"].map((priority, key) => (
                     <Button
                       onClick={() => {
                         const newPriorities = filters.priority.includes(
@@ -707,40 +716,49 @@ export default function BoardPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Board Content */}
+        {/* Workflow Content */}
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+          <Button
+            variant="ghost"
+            className="mb-4"
+            onClick={() => router.push(`/workflows?projectId=${projectId}`)}
+          >
+            <ArrowLeft className="mr-2" />
+            Back to Workflows
+          </Button>
+
           {/* Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-4 sm:gap-6">
               <div className="text-sm text-gray-600">
-                <span className="font-medium">Total Tasks: </span>
-                {columns.reduce((sum, col) => sum + col.tasks.length, 0)}
+                <span className="font-medium">Total Objects: </span>
+                {steps.reduce((sum, step) => sum + step.objects.length, 0)}
               </div>
             </div>
 
-            {/* Add task dialog */}
+            {/* Add object dialog */}
             <Dialog>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">
                   <Plus />
-                  Add Task
+                  Add Object
                 </Button>
               </DialogTrigger>
               <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
                 <DialogHeader>
-                  <DialogTitle>Create New Task</DialogTitle>
+                  <DialogTitle>Create New Object</DialogTitle>
                   <p className="text-sm text-gray-600">
-                    Add a task to the board
+                    Add an object to the workflow
                   </p>
                 </DialogHeader>
 
-                <form className="space-y-4" onSubmit={handleCreateTask}>
+                <form className="space-y-4" onSubmit={handleCreateObject}>
                   <div className="space-y-2">
                     <Label>Title *</Label>
                     <Input
                       id="title"
                       name="title"
-                      placeholder="Enter task title"
+                      placeholder="Enter object title"
                     />
                   </div>
                   <div className="space-y-2">
@@ -748,7 +766,7 @@ export default function BoardPage() {
                     <Textarea
                       id="description"
                       name="description"
-                      placeholder="Enter task description"
+                      placeholder="Enter object description"
                       rows={3}
                     />
                   </div>
@@ -757,7 +775,7 @@ export default function BoardPage() {
                     <Input
                       id="assignee"
                       name="assignee"
-                      placeholder="Who should do this?"
+                      placeholder="Who should work on this?"
                     />
                   </div>
 
@@ -768,7 +786,7 @@ export default function BoardPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {["low", "medium", "high"].map((priority, key) => (
+                        {["low", "medium", "high", "urgent"].map((priority, key) => (
                           <SelectItem key={key} value={priority}>
                             {priority.charAt(0).toUpperCase() +
                               priority.slice(1)}
@@ -784,15 +802,14 @@ export default function BoardPage() {
                   </div>
 
                   <div className="flex justify-end space-x-2 pt-4">
-                    <Button type="submit">Create Task</Button>
+                    <Button type="submit">Create Object</Button>
                   </div>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Board Columns */}
-
+          {/* Workflow Steps */}
           <DndContext
             sensors={sensors}
             collisionDetection={rectIntersection}
@@ -801,100 +818,100 @@ export default function BoardPage() {
             onDragEnd={handleDragEnd}
           >
             <div
-              className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto 
-            lg:pb-6 lg:px-2 lg:-mx-2 lg:[&::-webkit-scrollbar]:h-2 
-            lg:[&::-webkit-scrollbar-track]:bg-gray-100 
-            lg:[&::-webkit-scrollbar-thumb]:bg-gray-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full 
+              className="flex flex-col lg:flex-row lg:space-x-6 lg:overflow-x-auto
+            lg:pb-6 lg:px-2 lg:-mx-2 lg:[&::-webkit-scrollbar]:h-2
+            lg:[&::-webkit-scrollbar-track]:bg-gray-100
+            lg:[&::-webkit-scrollbar-thumb]:bg-gray-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full
             space-y-4 lg:space-y-0"
             >
-              {filteredColumns.map((column, key) => (
-                <DroppableColumn
+              {filteredSteps.map((step, key) => (
+                <DroppableStep
                   key={key}
-                  column={column}
-                  onCreateTask={handleCreateTask}
-                  onEditColumn={handleEditColumn}
+                  step={step}
+                  onCreateObject={handleCreateObject}
+                  onEditStep={handleEditStep}
                 >
                   <SortableContext
-                    items={column.tasks.map((task) => task.id)}
+                    items={step.objects.map((obj) => obj.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-3">
-                      {column.tasks.map((task, key) => (
-                        <SortableTask task={task} key={key} />
+                      {step.objects.map((obj, key) => (
+                        <SortableObject object={obj} key={key} />
                       ))}
                     </div>
                   </SortableContext>
-                </DroppableColumn>
+                </DroppableStep>
               ))}
 
               <div className="w-full lg:flex-shrink-0 lg:w-80">
                 <Button
                   variant="outline"
                   className="w-full h-full min-h-[200px] border-dashed border-2 text-gray-500 hover:text-gray-700"
-                  onClick={() => setIsCreatingColumn(true)}
+                  onClick={() => setIsCreatingStep(true)}
                 >
                   <Plus />
-                  Add another list
+                  Add another step
                 </Button>
               </div>
 
               <DragOverlay>
-                {activeTask ? <TaskOverlay task={activeTask} /> : null}
+                {activeObject ? <ObjectOverlay object={activeObject} /> : null}
               </DragOverlay>
             </div>
           </DndContext>
         </main>
       </div>
 
-      <Dialog open={isCreatingColumn} onOpenChange={setIsCreatingColumn}>
+      <Dialog open={isCreatingStep} onOpenChange={setIsCreatingStep}>
         <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
           <DialogHeader>
-            <DialogTitle>Create New Column</DialogTitle>
+            <DialogTitle>Create New Step</DialogTitle>
             <p className="text-sm text-gray-600">
-              Add new column to organize your tasks
+              Add new step to organize your objects
             </p>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleCreateColumn}>
+          <form className="space-y-4" onSubmit={handleCreateStep}>
             <div className="space-y-2">
-              <Label>Column Title</Label>
+              <Label>Step Title</Label>
               <Input
-                id="columnTitle"
-                value={newColumnTitle}
-                onChange={(e) => setNewColumnTitle(e.target.value)}
-                placeholder="Enter column title..."
+                id="stepTitle"
+                value={newStepTitle}
+                onChange={(e) => setNewStepTitle(e.target.value)}
+                placeholder="Enter step title..."
                 required
               />
             </div>
             <div className="space-x-2 flex justify-end">
               <Button
                 type="button"
-                onClick={() => setIsCreatingColumn(false)}
+                onClick={() => setIsCreatingStep(false)}
                 variant="outline"
               >
                 Cancel
               </Button>
-              <Button type="submit">Create Column</Button>
+              <Button type="submit">Create Step</Button>
             </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEditingColumn} onOpenChange={setIsEditingColumn}>
+      <Dialog open={isEditingStep} onOpenChange={setIsEditingStep}>
         <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
           <DialogHeader>
-            <DialogTitle>Edit Column</DialogTitle>
+            <DialogTitle>Edit Step</DialogTitle>
             <p className="text-sm text-gray-600">
-              Update the title of your column
+              Update the title of your step
             </p>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleUpdateColumn}>
+          <form className="space-y-4" onSubmit={handleUpdateStep}>
             <div className="space-y-2">
-              <Label>Column Title</Label>
+              <Label>Step Title</Label>
               <Input
-                id="columnTitle"
-                value={editingColumnTitle}
-                onChange={(e) => setEditingColumnTitle(e.target.value)}
-                placeholder="Enter column title..."
+                id="stepTitle"
+                value={editingStepTitle}
+                onChange={(e) => setEditingStepTitle(e.target.value)}
+                placeholder="Enter step title..."
                 required
               />
             </div>
@@ -902,15 +919,15 @@ export default function BoardPage() {
               <Button
                 type="button"
                 onClick={() => {
-                  setIsEditingColumn(false);
-                  setEditingColumnTitle("");
-                  setEditingColumn(null);
+                  setIsEditingStep(false);
+                  setEditingStepTitle("");
+                  setEditingStep(null);
                 }}
                 variant="outline"
               >
                 Cancel
               </Button>
-              <Button type="submit">Edit Column</Button>
+              <Button type="submit">Edit Step</Button>
             </div>
           </form>
         </DialogContent>
