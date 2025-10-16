@@ -1,7 +1,4 @@
 import {
-  Board,
-  Column,
-  Task,
   Project,
   Workflow,
   Step,
@@ -16,150 +13,6 @@ import {
   LexiconType,
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
-
-// =======================
-// BOARD SERVICES
-// =======================
-export const boardService = {
-  async getBoard(supabase: SupabaseClient, boardId: number): Promise<Board> {
-    const { data, error } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("id", boardId)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async getBoards(supabase: SupabaseClient, userId: string): Promise<Board[]> {
-    const { data, error } = await supabase
-      .from("boards")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async createBoard(
-    supabase: SupabaseClient,
-    board: Omit<Board, "id" | "created_at" | "updated_at">
-  ): Promise<Board> {
-    const { data, error } = await supabase
-      .from("boards")
-      .insert(board)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async updateBoard(
-    supabase: SupabaseClient,
-    boardId: number,
-    updates: Partial<Board>
-  ): Promise<Board> {
-    const { data, error } = await supabase
-      .from("boards")
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq("id", boardId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-};
-
-// =======================
-// COLUMN SERVICES
-// =======================
-export const columnService = {
-  async getColumns(
-    supabase: SupabaseClient,
-    boardId: number
-  ): Promise<Column[]> {
-    const { data, error } = await supabase
-      .from("columns")
-      .select("*")
-      .eq("board_id", boardId)
-      .order("sort_order", { ascending: true });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async createColumn(
-    supabase: SupabaseClient,
-    column: Omit<Column, "id" | "created_at">
-  ): Promise<Column> {
-    const { data, error } = await supabase
-      .from("columns")
-      .insert(column)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async updateColumnTitle(
-    supabase: SupabaseClient,
-    columnId: number,
-    title: string
-  ): Promise<Column> {
-    const { data, error } = await supabase
-      .from("columns")
-      .update({ title })
-      .eq("id", columnId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-};
-
-// =======================
-// TASK SERVICES
-// =======================
-export const taskService = {
-  async getTasksByBoard(
-    supabase: SupabaseClient,
-    boardId: number
-  ): Promise<Task[]> {
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*, columns!inner(board_id)")
-      .eq("columns.board_id", boardId)
-      .order("sort_order", { ascending: true });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async createTask(
-    supabase: SupabaseClient,
-    task: Omit<Task, "id" | "created_at">
-  ): Promise<Task> {
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert(task)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  },
-
-  async moveTask(
-    supabase: SupabaseClient,
-    taskId: number,
-    newColumnId: number,
-    newOrder: number
-  ) {
-    const { data, error } = await supabase
-      .from("tasks")
-      .update({ column_id: newColumnId, sort_order: newOrder })
-      .eq("id", taskId);
-    if (error) throw error;
-    return data;
-  },
-};
 
 // =======================
 // PROJECT SERVICES
@@ -196,12 +49,51 @@ export const projectService = {
     if (error) throw error;
     return data;
   },
+
+  async updateProject(
+    supabase: SupabaseClient,
+    projectId: number,
+    updates: Partial<Project>
+  ): Promise<Project> {
+    const { data, error } = await supabase
+      .from("projects")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", projectId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteProject(
+    supabase: SupabaseClient,
+    projectId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+    if (error) throw error;
+  },
 };
 
 // =======================
 // WORKFLOW SERVICES
 // =======================
 export const workflowService = {
+  async getWorkflow(
+    supabase: SupabaseClient,
+    workflowId: number
+  ): Promise<Workflow> {
+    const { data, error } = await supabase
+      .from("workflows")
+      .select("*")
+      .eq("id", workflowId)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getWorkflowsByProject(
     supabase: SupabaseClient,
     projectId: number
@@ -213,6 +105,34 @@ export const workflowService = {
       .order("created_at", { ascending: true });
     if (error) throw error;
     return data || [];
+  },
+
+  async createWorkflow(
+    supabase: SupabaseClient,
+    workflow: Omit<Workflow, "id" | "created_at" | "updated_at">
+  ): Promise<Workflow> {
+    const { data, error } = await supabase
+      .from("workflows")
+      .insert(workflow)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateWorkflow(
+    supabase: SupabaseClient,
+    workflowId: number,
+    updates: Partial<Workflow>
+  ): Promise<Workflow> {
+    const { data, error } = await supabase
+      .from("workflows")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", workflowId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   },
 };
 
@@ -231,6 +151,34 @@ export const stepService = {
       .order("position", { ascending: true });
     if (error) throw error;
     return data || [];
+  },
+
+  async createStep(
+    supabase: SupabaseClient,
+    step: Omit<Step, "id" | "created_at">
+  ): Promise<Step> {
+    const { data, error } = await supabase
+      .from("steps")
+      .insert(step)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updateStepTitle(
+    supabase: SupabaseClient,
+    stepId: number,
+    title: string
+  ): Promise<Step> {
+    const { data, error } = await supabase
+      .from("steps")
+      .update({ title })
+      .eq("id", stepId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   },
 };
 
@@ -270,6 +218,38 @@ export const objectService = {
     const { data, error } = await supabase
       .from("objects")
       .insert(obj)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async moveObject(
+    supabase: SupabaseClient,
+    objectId: number,
+    newStepId: number | null,
+    newOrder: number
+  ) {
+    const { data, error } = await supabase
+      .from("objects")
+      .update({
+        step_id: newStepId ? [newStepId] : null,
+        sort_order: newOrder
+      })
+      .eq("id", objectId);
+    if (error) throw error;
+    return data;
+  },
+
+  async updateObject(
+    supabase: SupabaseClient,
+    objectId: number,
+    updates: Partial<ScadaObject>
+  ): Promise<ScadaObject> {
+    const { data, error } = await supabase
+      .from("objects")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", objectId)
       .select()
       .single();
     if (error) throw error;

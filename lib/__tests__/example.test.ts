@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestSupabaseClient } from "./setup";
-import { boardService } from "../services";
 import {
   generateTestId,
-  createTestBoard,
+  createTestProject,
   cleanupTestData,
   wait,
   isValidTimestamp,
@@ -17,52 +16,56 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 describe("Example Test Suite with Helpers", () => {
   let supabase: SupabaseClient;
-  let testUserId: string;
-  let createdBoardIds: number[] = [];
+  let testOrgId: string;
+  let createdProjectIds: number[] = [];
 
   beforeEach(() => {
     supabase = createTestSupabaseClient();
-    testUserId = generateTestId("user");
-    createdBoardIds = [];
+    testOrgId = generateTestId("org");
+    createdProjectIds = [];
   });
 
   afterEach(async () => {
-    // Cleanup all created boards
-    for (const boardId of createdBoardIds) {
-      await cleanupTestData(supabase, "boards", "id", boardId);
+    // Cleanup all created projects
+    for (const projectId of createdProjectIds) {
+      await cleanupTestData(supabase, "projects", "id", projectId);
     }
   });
 
-  it("should create a board using helper function", async () => {
-    const board = await createTestBoard(supabase, testUserId, {
-      title: "My Custom Board",
-      color: "#00FF00",
+  it("should create a project using helper function", async () => {
+    const project = await createTestProject(supabase, testOrgId, {
+      name: "My Custom Project",
+      code: "MCP",
     });
 
-    createdBoardIds.push(board.id);
+    createdProjectIds.push(project.id);
 
-    expect(board).toBeDefined();
-    expect(board.title).toBe("My Custom Board");
-    expect(board.color).toBe("#00FF00");
-    expect(isValidTimestamp(board.created_at)).toBe(true);
-    expect(hasRequiredFields(board, ["id", "title", "user_id"])).toBe(true);
+    expect(project).toBeDefined();
+    expect(project.name).toBe("My Custom Project");
+    expect(project.code).toBe("MCP");
+    expect(isValidTimestamp(project.created_at)).toBe(true);
+    expect(hasRequiredFields(project, ["id", "name", "org_id"])).toBe(true);
   });
 
   it("should demonstrate timestamp comparison with wait helper", async () => {
-    const board = await createTestBoard(supabase, testUserId);
-    createdBoardIds.push(board.id);
+    const project = await createTestProject(supabase, testOrgId);
+    createdProjectIds.push(project.id);
 
-    const originalUpdatedAt = board.updated_at;
+    const originalUpdatedAt = project.updated_at;
 
     // Wait to ensure timestamp difference
     await wait(100);
 
-    const updatedBoard = await boardService.updateBoard(supabase, board.id, {
-      title: "Updated Title",
-    });
+    // Manually update the project to demonstrate timestamp change
+    const { data: updatedProject } = await supabase
+      .from("projects")
+      .update({ name: "Updated Name", updated_at: new Date().toISOString() })
+      .eq("id", project.id)
+      .select()
+      .single();
 
-    expect(updatedBoard.updated_at).not.toBe(originalUpdatedAt);
-    expect(new Date(updatedBoard.updated_at).getTime()).toBeGreaterThan(
+    expect(updatedProject?.updated_at).not.toBe(originalUpdatedAt);
+    expect(new Date(updatedProject?.updated_at || "").getTime()).toBeGreaterThan(
       new Date(originalUpdatedAt).getTime()
     );
   });
