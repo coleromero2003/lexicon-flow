@@ -35,9 +35,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 
-export default function WorkflowsPage() {
+function WorkflowsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = searchParams.get("projectId");
@@ -507,5 +507,22 @@ export default function WorkflowsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function WorkflowsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="container mx-auto px-4 py-6 sm:py-8">
+          <div className="text-center py-12">
+            <p className="text-gray-600">Loading workflows...</p>
+          </div>
+        </main>
+      </div>
+    }>
+      <WorkflowsContent />
+    </Suspense>
   );
 }
