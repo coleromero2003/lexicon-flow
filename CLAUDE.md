@@ -10,6 +10,7 @@ Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition)
 - Next.js 15 with App Router and React 19
 - Supabase for database, authentication, and storage
 - Clerk for advanced authentication and organization management
+- Sentry for error monitoring and performance tracking
 - Vitest for testing
 - TailwindCSS 4 for styling
 
@@ -58,6 +59,7 @@ supabase stop        # Stop local Supabase instance
   - `hooks/useProjects.ts` - React hooks for project management
   - `hooks/useWorkflows.ts` - React hooks for workflow management
   - `contexts/PlanContext.tsx` - Subscription plan context
+  - `sentry.ts` - Sentry utility functions for error tracking and monitoring
 
 - **`components/`** - Reusable UI components
   - `ui/` - shadcn/ui components (button, dialog, input, etc.)
@@ -65,6 +67,9 @@ supabase stop        # Stop local Supabase instance
   - `cookie-notice.tsx` - GDPR cookie consent component
 
 - **`supabase/migrations/`** - Database migrations
+
+- **`docs/`** - Documentation
+  - `SENTRY.md` - Comprehensive Sentry monitoring documentation
 
 ### Data Model
 
@@ -132,6 +137,9 @@ Required environment variables (see `.env` example in README):
 For testing (`.env.test`):
 - `SUPABASE_URL` - Local Supabase URL (default: http://127.0.0.1:54321)
 - `SUPABASE_ANON_KEY` - Local Supabase anon key
+
+For Sentry (optional in `.env`):
+- `SENTRY_ENABLED` - Enable Sentry in development (disabled by default)
 
 ## Testing Strategy
 
@@ -220,6 +228,42 @@ Provides deployment and project management tools:
 - Check `get_logs` when debugging issues with auth, API, or database
 - Use Vercel MCP for deployment automation and monitoring
 
+## Monitoring & Error Tracking
+
+The application uses **Sentry** for comprehensive error monitoring and performance tracking. See [docs/SENTRY.md](docs/SENTRY.md) for complete documentation.
+
+**Key Features:**
+- Automatic error capture (client & server)
+- Performance monitoring and tracing
+- Session replay for debugging
+- User context tracking (integrated with Clerk)
+- Organization-based error tagging
+- User feedback collection
+
+**Configuration Files:**
+- `instrumentation-client.ts` - Client-side Sentry configuration
+- `sentry.server.config.ts` - Server-side Sentry configuration
+- `sentry.edge.config.ts` - Edge runtime Sentry configuration
+- `instrumentation.ts` - Sentry initialization
+- `lib/sentry.ts` - Utility functions for custom tracking
+
+**Middleware Integration:**
+The [middleware.ts](middleware.ts) automatically:
+- Sets user context from Clerk authentication
+- Tags errors with organization IDs
+- Tracks request breadcrumbs for debugging
+
+**Usage Examples:**
+```typescript
+import { trackScadaOperation, withSentryTracking } from '@/lib/sentry';
+
+// Track SCADA operations
+trackScadaOperation('object_update', projectId, true, { objectId });
+
+// Wrap functions with error tracking
+const trackedFn = withSentryTracking(myFunction, 'operation_name');
+```
+
 ## Key Features to Remember
 
 1. **Organization-scoped data model**: All data is scoped to organizations via Clerk
@@ -232,3 +276,4 @@ Provides deployment and project management tools:
 8. **Organization support** via Clerk for team collaboration
 9. **Comprehensive testing** setup with Vitest
 10. **MCP server integration** for enhanced development workflow
+11. **Error monitoring & performance tracking** with Sentry (includes session replay, user feedback)
