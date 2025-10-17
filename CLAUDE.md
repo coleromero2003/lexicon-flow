@@ -13,6 +13,7 @@ Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition)
 - Sentry for error monitoring and performance tracking
 - Vitest for testing
 - TailwindCSS 4 for styling
+- Shadcn UI components for unified design
 
 ## Development Commands
 

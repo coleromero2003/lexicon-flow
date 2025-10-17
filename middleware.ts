@@ -1,5 +1,10 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
+
+const isPublicRoute = createRouteMatcher([
+  '/.well-known/oauth-authorization-server(.*)',
+  '/.well-known/oauth-protected-resource(.*)',
+])
 
 export default clerkMiddleware(async (auth, req) => {
   // Get auth information
@@ -16,6 +21,8 @@ export default clerkMiddleware(async (auth, req) => {
   } else {
     Sentry.setUser(null);
   }
+  if (isPublicRoute(req)) return // Allow public access to .well-known endpoints
+  await auth.protect() // Protect all other routes
 
   // Add breadcrumb for request tracking
   Sentry.addBreadcrumb({
