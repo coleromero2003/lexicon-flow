@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function CookieNotice() {
@@ -23,12 +24,12 @@ export default function CookieNotice() {
     <div className="fixed inset-x-0 bottom-0 z-50 bg-gray-900 text-white text-sm py-3 px-4 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 shadow-lg">
       <p>
         By using this website, you agree to our use of cookies.{" "}
-        <a
+        <Link
           href="/legal/privacy"
           className="underline hover:text-gray-300 transition"
         >
           Learn more
-        </a>
+        </Link>
         .
       </p>
       <button

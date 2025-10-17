@@ -15,7 +15,6 @@ import {
   verifyObjectOrder,
   validateSortOrders,
   simulateCrossStepDrag,
-  simulateWithinStepReorder,
   simulateCancelledDrag,
   createStepWithPriorityDistribution,
   measureDragPerformance,
