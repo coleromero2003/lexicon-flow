@@ -2,6 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import * as Sentry from "@sentry/nextjs";
 
 const isPublicRoute = createRouteMatcher([
+  '/',
+  '/pricing(.*)',
+  '/legal(.*)',
   '/.well-known/oauth-authorization-server(.*)',
   '/.well-known/oauth-protected-resource(.*)',
 ])
