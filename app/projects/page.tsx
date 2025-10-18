@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { Project } from "@/lib/supabase/models";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useUser } from "@clerk/nextjs";
 import {
   Filter,
   Grid3x3,
@@ -32,9 +32,12 @@ import {
   FolderKanban,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function ProjectsPage() {
+  const router = useRouter();
+  const { isSignedIn, isLoaded: userLoaded } = useUser();
   const { organization } = useOrganization();
   const { createProject, projects, error } = useProjects();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -48,6 +51,30 @@ export default function ProjectsPage() {
       end: null as string | null,
     },
   });
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (userLoaded && !isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isSignedIn, userLoaded, router]);
+
+  // Show loading while checking authentication
+  if (!userLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not signed in (will redirect)
+  if (!isSignedIn) {
+    return null;
+  }
 
   const filteredProjects = projects.filter((project: Project) => {
     const matchesSearch = project.name

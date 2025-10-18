@@ -23,7 +23,7 @@ import { useWorkflows } from "@/lib/hooks/useWorkflows";
 import { projectService } from "@/lib/services";
 import { Workflow } from "@/lib/supabase/models";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useUser } from "@clerk/nextjs";
 import {
   Filter,
   Grid3x3,
@@ -43,6 +43,7 @@ function WorkflowsContent() {
   const projectId = searchParams.get("projectId");
   const projectIdNum = projectId ? parseInt(projectId, 10) : 0;
 
+  const { isSignedIn, isLoaded: userLoaded } = useUser();
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
   const { createWorkflow, workflows, error } = useWorkflows(projectIdNum);
@@ -54,6 +55,13 @@ function WorkflowsContent() {
   const [filters, setFilters] = useState({
     search: "",
   });
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (userLoaded && !isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isSignedIn, userLoaded, router]);
 
   useEffect(() => {
     async function loadProject() {
@@ -71,6 +79,23 @@ function WorkflowsContent() {
     }
     loadProject();
   }, [projectIdNum, supabase]);
+
+  // Show loading while checking authentication
+  if (!userLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not signed in (will redirect)
+  if (!isSignedIn) {
+    return null;
+  }
 
   const filteredWorkflows = workflows.filter((workflow: Workflow) => {
     const matchesSearch = workflow.name

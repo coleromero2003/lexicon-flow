@@ -22,11 +22,12 @@ export function useProjects() {
 
   async function loadProjects() {
     if (!organization) return;
+    if (!supabase) return; // Wait for Supabase client to be initialized
 
     try {
       setLoading(true);
       setError(null);
-      const data = await projectService.getProjects(supabase!);
+      const data = await projectService.getProjects(supabase);
       setProjects(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load projects.");

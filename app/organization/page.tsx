@@ -1,13 +1,41 @@
 "use client";
 
-import { OrganizationProfile, CreateOrganization, useOrganization } from "@clerk/nextjs";
+import { OrganizationProfile, CreateOrganization, useOrganization, useUser } from "@clerk/nextjs";
 import Navbar from "@/components/navbar";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function OrganizationPage() {
+  const router = useRouter();
+  const { isSignedIn, isLoaded: userLoaded } = useUser();
   const { organization } = useOrganization();
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (userLoaded && !isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isSignedIn, userLoaded, router]);
+
+  // Show loading while checking authentication
+  if (!userLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not signed in (will redirect)
+  if (!isSignedIn) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
