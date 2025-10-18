@@ -7,6 +7,9 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, req) => {
+  if (isPublicRoute(req)) return // Allow public access to .well-known endpoints
+  await auth.protect() // Protect all other routes
+
   // Get auth information
   const { userId, orgId } = await auth();
 
@@ -21,8 +24,6 @@ export default clerkMiddleware(async (auth, req) => {
   } else {
     Sentry.setUser(null);
   }
-  if (isPublicRoute(req)) return // Allow public access to .well-known endpoints
-  await auth.protect() // Protect all other routes
 
   // Add breadcrumb for request tracking
   Sentry.addBreadcrumb({
