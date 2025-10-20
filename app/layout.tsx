@@ -4,6 +4,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import SupabaseProvider from "@/lib/supabase/SupabaseProvider";
 import CookieNotice from "@/components/cookie-notice";
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +35,8 @@ export default function RootLayout({
         >
           <SupabaseProvider>{children}</SupabaseProvider>
           <CookieNotice/>
+          <Analytics/>
+          <SpeedInsights/>
         </body>
       </html>
     </ClerkProvider>

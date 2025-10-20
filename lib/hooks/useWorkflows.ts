@@ -26,12 +26,13 @@ export function useWorkflows(projectId: number) {
 
   async function loadWorkflows() {
     if (!projectId) return;
+    if (!supabase) return; // Wait for Supabase client to be initialized
 
     try {
       setLoading(true);
       setError(null);
       const data = await workflowService.getWorkflowsByProject(
-        supabase!,
+        supabase,
         projectId
       );
       setWorkflows(data);
@@ -50,10 +51,11 @@ export function useWorkflows(projectId: number) {
     color?: string;
   }) {
     if (!organization) throw new Error("Organization not found");
+    if (!supabase) throw new Error("Supabase client not initialized");
 
     try {
       // Create the workflow
-      const newWorkflow = await workflowService.createWorkflow(supabase!, {
+      const newWorkflow = await workflowService.createWorkflow(supabase, {
         name: workflowData.name,
         description: workflowData.description || null,
         color: workflowData.color || "#3b82f6",
@@ -64,7 +66,7 @@ export function useWorkflows(projectId: number) {
       const defaultSteps = ["To Do", "Working On", "Review", "Complete"];
       await Promise.all(
         defaultSteps.map((title, index) =>
-          stepService.createStep(supabase!, {
+          stepService.createStep(supabase, {
             title,
             workflow_id: newWorkflow.id,
             position: index,
@@ -103,6 +105,7 @@ export function useWorkflow(workflowId: number) {
 
   async function loadWorkflow() {
     if (!workflowId) return;
+    if (!supabase) return; // Wait for Supabase client to be initialized
 
     try {
       setLoading(true);
@@ -110,20 +113,20 @@ export function useWorkflow(workflowId: number) {
 
       // Get workflow
       const workflowData = await workflowService.getWorkflow(
-        supabase!,
+        supabase,
         workflowId
       );
       setWorkflow(workflowData);
 
       // Get steps for this workflow
       const stepsData = await stepService.getStepsByWorkflow(
-        supabase!,
+        supabase,
         workflowId
       );
 
       // Get objects for this workflow
       const objectsData = await objectService.getObjectsByWorkflow(
-        supabase!,
+        supabase,
         workflowId
       );
 
@@ -144,9 +147,11 @@ export function useWorkflow(workflowId: number) {
   }
 
   async function updateWorkflow(workflowId: number, updates: Partial<Workflow>) {
+    if (!supabase) throw new Error("Supabase client not initialized");
+
     try {
       const updatedWorkflow = await workflowService.updateWorkflow(
-        supabase!,
+        supabase,
         workflowId,
         updates
       );
@@ -171,8 +176,9 @@ export function useWorkflow(workflowId: number) {
   ) {
     try {
       if (!workflow) throw new Error("Workflow not loaded");
+      if (!supabase) throw new Error("Supabase client not initialized");
 
-      const newObject = await objectService.createObject(supabase!, {
+      const newObject = await objectService.createObject(supabase, {
         title: objectData.title,
         description_md: objectData.description || null,
         assignee: objectData.assignee || null,
@@ -207,8 +213,10 @@ export function useWorkflow(workflowId: number) {
     newStepId: number,
     newOrder: number
   ) {
+    if (!supabase) throw new Error("Supabase client not initialized");
+
     try {
-      await objectService.moveObject(supabase!, objectId, newStepId, newOrder);
+      await objectService.moveObject(supabase, objectId, newStepId, newOrder);
 
       setSteps((prev) => {
         const newSteps = [...prev];
@@ -243,9 +251,10 @@ export function useWorkflow(workflowId: number) {
 
   async function createStep(title: string) {
     if (!workflow || !organization) throw new Error("Workflow not loaded");
+    if (!supabase) throw new Error("Supabase client not initialized");
 
     try {
-      const newStep = await stepService.createStep(supabase!, {
+      const newStep = await stepService.createStep(supabase, {
         title,
         workflow_id: workflow.id,
         position: steps.length,
@@ -259,9 +268,11 @@ export function useWorkflow(workflowId: number) {
   }
 
   async function updateStep(stepId: number, title: string) {
+    if (!supabase) throw new Error("Supabase client not initialized");
+
     try {
       const updatedStep = await stepService.updateStepTitle(
-        supabase!,
+        supabase,
         stepId,
         title
       );

@@ -34,18 +34,18 @@ export default async function Page() {
           dangerouslySetInnerHTML={{ __html: html }}
           />
         <nav className="flex justify-between mt-12">
-          <a
+          <Link
             href="/legal/service_agreement"
             className="px-4 py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
           >
             ← Service Agreement
-          </a>
-          <a
+          </Link>
+          <Link
             href="/legal/privacy"
             className="px-4 py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
           >
             Privacy Policy →
-          </a>
+          </Link>
         </nav>
       </main>
       <footer className="bg-gray-900 text-white py-12">
