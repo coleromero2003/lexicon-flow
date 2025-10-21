@@ -2,8 +2,16 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useObject } from "@/lib/hooks/useObjects";
+import { useSubtasks } from "@/lib/hooks/useSubtasks";
+import { useObjectFiles } from "@/lib/hooks/useObjectFiles";
+import { useObjectRelations } from "@/lib/hooks/useObjectRelations";
+import { useObjectLexicon } from "@/lib/hooks/useObjectLexicon";
+import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
+import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
+import { useSupabase } from "@/lib/supabase/SupabaseProvider";
+import { objectService } from "@/lib/services";
 import Navbar from "@/components/navbar";
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -20,9 +28,9 @@ import {
   Settings,
   Trash2,
   Edit3,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -74,14 +82,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
-
-// Mock data for assignees - replace with actual data from your system
-const ASSIGNEES = [
-  { value: "john.doe", label: "John Doe" },
-  { value: "jane.smith", label: "Jane Smith" },
-  { value: "bob.johnson", label: "Bob Johnson" },
-  { value: "alice.williams", label: "Alice Williams" },
-];
+import { MarkdownEditor } from "@/components/mdx-editor";
+import { MetadataEditor } from "@/components/metadata-editor";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { ObjectSubtask } from "@/lib/supabase/models";
 
 const PRIORITIES = [
   { value: "low", label: "Low", color: "bg-green-500" },
@@ -90,21 +110,87 @@ const PRIORITIES = [
   { value: "urgent", label: "Urgent", color: "bg-red-600" },
 ];
 
+interface SortableSubtaskProps {
+  subtask: ObjectSubtask;
+  onToggle: (id: number, isDone: boolean) => void;
+  onDelete: (id: number) => void;
+}
+
+function SortableSubtask({ subtask, onToggle, onDelete }: SortableSubtaskProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: subtask.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group bg-white"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+      >
+        <GripVertical className="h-4 w-4" />
+      </div>
+      <Checkbox
+        checked={subtask.is_done}
+        onCheckedChange={(checked) => onToggle(subtask.id, checked as boolean)}
+      />
+      <span
+        className={`text-sm flex-1 ${
+          subtask.is_done ? "line-through text-gray-400" : "text-gray-900"
+        }`}
+      >
+        {subtask.title}
+      </span>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => onDelete(subtask.id)}
+        className="opacity-0 group-hover:opacity-100 text-red-600"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
     objectId: string;
     projectId: string;
   }>();
   const router = useRouter();
-  const { object, loading, error, updateObject, toggleSubtask } = useObject(
-    parseInt(objectId, 10)
-  );
+  const parsedObjectId = parseInt(objectId, 10);
+  const parsedProjectId = parseInt(projectId, 10);
 
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [description, setDescription] = useState("");
+  const { object, loading, error, updateObject } = useObject(parsedObjectId);
+  const subtasksHook = useSubtasks(parsedObjectId);
+  const filesHook = useObjectFiles(parsedObjectId);
+  const relationsHook = useObjectRelations(parsedObjectId);
+  const lexiconHook = useObjectLexicon(parsedObjectId);
+  const { users: orgUsers } = useOrganizationUsers();
+  const { suggestions: metadataSuggestions } = useMetadataSuggestions(parsedProjectId);
+  const { supabase } = useSupabase();
+
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -114,7 +200,66 @@ export default function ObjectPage() {
     priority: "medium",
   });
 
-  if (loading) {
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Debounce timer ref for auto-save
+  const descriptionTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  const handleDescriptionChange = useCallback(
+    (newMarkdown: string) => {
+      // Clear existing timer
+      if (descriptionTimerRef.current) {
+        clearTimeout(descriptionTimerRef.current);
+      }
+
+      // Set new timer to save after 1 second of no typing
+      descriptionTimerRef.current = setTimeout(async () => {
+        if (!supabase) return;
+
+        try {
+          // Update directly without reloading the entire object to prevent refresh
+          await objectService.updateObject(
+            supabase,
+            parsedObjectId,
+            { description_md: newMarkdown }
+          );
+        } catch (err) {
+          console.error("Failed to update description:", err);
+          toast.error("Failed to update description");
+        }
+      }, 1000);
+    },
+    [supabase, parsedObjectId]
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = subtasksHook.subtasks.findIndex((s) => s.id === active.id);
+    const newIndex = subtasksHook.subtasks.findIndex((s) => s.id === over.id);
+
+    const reordered = arrayMove(subtasksHook.subtasks, oldIndex, newIndex);
+
+    try {
+      await subtasksHook.reorderSubtasks(reordered);
+      toast.success("Subtasks reordered");
+    } catch (err) {
+      console.error("Failed to reorder subtasks:", err);
+      toast.error("Failed to reorder subtasks");
+    }
+  };
+
+  if (loading || subtasksHook.loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar boardTitle="Loading..." />
@@ -127,28 +272,6 @@ export default function ObjectPage() {
               <Skeleton className="h-6 w-24" />
               <Skeleton className="h-6 w-32" />
               <Skeleton className="h-6 w-20" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-6 w-32" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-32 w-full" />
-                </CardContent>
-              </Card>
-            </div>
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <Skeleton className="h-6 w-24" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-20 w-full" />
-                </CardContent>
-              </Card>
             </div>
           </div>
         </main>
@@ -164,7 +287,10 @@ export default function ObjectPage() {
           <EmptyState
             icon={<FileText className="h-12 w-12" />}
             title="Object not found"
-            description={error || "The object you're looking for doesn't exist or has been deleted."}
+            description={
+              error ||
+              "The object you're looking for doesn't exist or has been deleted."
+            }
             action={
               <Button variant="outline" onClick={() => router.back()}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -176,17 +302,6 @@ export default function ObjectPage() {
       </div>
     );
   }
-
-  const handleSaveDescription = async () => {
-    try {
-      await updateObject({ description_md: description });
-      setIsEditingDescription(false);
-      toast.success("Description updated successfully");
-    } catch (err) {
-      console.error("Failed to update description:", err);
-      toast.error("Failed to update description");
-    }
-  };
 
   const handleOpenEditSheet = () => {
     setEditForm({
@@ -216,11 +331,45 @@ export default function ObjectPage() {
 
   const handleToggleSubtask = async (subtaskId: number, isDone: boolean) => {
     try {
-      await toggleSubtask(subtaskId, isDone);
+      await subtasksHook.toggleSubtask(subtaskId, isDone);
       toast.success(isDone ? "Subtask completed" : "Subtask reopened");
     } catch (err) {
       console.error("Failed to toggle subtask:", err);
       toast.error("Failed to update subtask");
+    }
+  };
+
+  const handleAddSubtask = async () => {
+    if (!newSubtaskTitle.trim()) return;
+
+    try {
+      await subtasksHook.createSubtask(newSubtaskTitle.trim());
+      setNewSubtaskTitle("");
+      setIsAddingSubtask(false);
+      toast.success("Subtask added");
+    } catch (err) {
+      console.error("Failed to add subtask:", err);
+      toast.error("Failed to add subtask");
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: number) => {
+    try {
+      await subtasksHook.deleteSubtask(subtaskId);
+      toast.success("Subtask deleted");
+    } catch (err) {
+      console.error("Failed to delete subtask:", err);
+      toast.error("Failed to delete subtask");
+    }
+  };
+
+  const handleMetadataUpdate = async (newMetadata: Record<string, unknown>) => {
+    try {
+      await updateObject({ metadata: newMetadata });
+      toast.success("Properties updated");
+    } catch (err) {
+      console.error("Failed to update properties:", err);
+      toast.error("Failed to update properties");
     }
   };
 
@@ -295,22 +444,22 @@ export default function ObjectPage() {
                             className="w-full justify-between"
                           >
                             {editForm.assignee
-                              ? ASSIGNEES.find((a) => a.value === editForm.assignee)
-                                  ?.label
+                              ? orgUsers.find((u) => u.userId === editForm.assignee)
+                                  ?.name || editForm.assignee
                               : "Select assignee..."}
                             <User className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0">
                           <Command>
-                            <CommandInput placeholder="Search assignee..." />
+                            <CommandInput placeholder="Search users..." />
                             <CommandList>
-                              <CommandEmpty>No assignee found.</CommandEmpty>
+                              <CommandEmpty>No user found.</CommandEmpty>
                               <CommandGroup>
-                                {ASSIGNEES.map((assignee) => (
+                                {orgUsers.map((user) => (
                                   <CommandItem
-                                    key={assignee.value}
-                                    value={assignee.value}
+                                    key={user.userId}
+                                    value={user.userId}
                                     onSelect={(currentValue) => {
                                       setEditForm({
                                         ...editForm,
@@ -321,12 +470,12 @@ export default function ObjectPage() {
                                   >
                                     <Check
                                       className={`mr-2 h-4 w-4 ${
-                                        editForm.assignee === assignee.value
+                                        editForm.assignee === user.userId
                                           ? "opacity-100"
                                           : "opacity-0"
                                       }`}
                                     />
-                                    {assignee.label}
+                                    {user.name}
                                   </CommandItem>
                                 ))}
                               </CommandGroup>
@@ -433,7 +582,8 @@ export default function ObjectPage() {
             {object.assignee && (
               <Badge variant="secondary" className="flex items-center gap-1">
                 <User className="h-3 w-3" />
-                {object.assignee}
+                {orgUsers.find((u) => u.userId === object.assignee)?.name ||
+                  object.assignee}
               </Badge>
             )}
             {object.due_date && (
@@ -463,42 +613,11 @@ export default function ObjectPage() {
                 <CardTitle className="text-lg">Description</CardTitle>
               </CardHeader>
               <CardContent>
-                {isEditingDescription ? (
-                  <div className="space-y-3">
-                    <Textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="min-h-32"
-                      placeholder="Enter object description..."
-                    />
-                    <div className="flex gap-2">
-                      <Button onClick={handleSaveDescription} size="sm">
-                        Save
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsEditingDescription(false)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => {
-                      setDescription(object.description_md || "");
-                      setIsEditingDescription(true);
-                    }}
-                    className="min-h-20 p-3 rounded-md hover:bg-gray-50 cursor-pointer text-sm text-gray-700"
-                  >
-                    {object.description_md || (
-                      <span className="text-gray-400">
-                        Click to add description...
-                      </span>
-                    )}
-                  </div>
-                )}
+                <MarkdownEditor
+                  markdown={object.description_md || ""}
+                  onChange={handleDescriptionChange}
+                  placeholder="Enter object description using markdown..."
+                />
               </CardContent>
             </Card>
 
@@ -565,49 +684,87 @@ export default function ObjectPage() {
                   </CardTitle>
                   <CardDescription>Track progress with subtasks</CardDescription>
                 </div>
-                <Button size="sm" variant="outline">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
+                {!isAddingSubtask && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsAddingSubtask(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
-                {object.subtasks.length === 0 ? (
+                {isAddingSubtask && (
+                  <div className="mb-4 flex gap-2">
+                    <Input
+                      value={newSubtaskTitle}
+                      onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                      placeholder="Subtask title"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddSubtask();
+                        if (e.key === "Escape") {
+                          setIsAddingSubtask(false);
+                          setNewSubtaskTitle("");
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <Button onClick={handleAddSubtask} size="sm">
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsAddingSubtask(false);
+                        setNewSubtaskTitle("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+
+                {subtasksHook.subtasks.length === 0 && !isAddingSubtask ? (
                   <EmptyState
                     icon={<ListTodo className="h-8 w-8" />}
                     title="No subtasks"
                     description="Break down this object into smaller tasks."
                     action={
-                      <Button size="sm" variant="outline">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsAddingSubtask(true)}
+                      >
                         <Plus className="h-4 w-4 mr-1" />
                         Add Subtask
                       </Button>
                     }
                   />
                 ) : (
-                  <div className="space-y-2">
-                    {object.subtasks.map((subtask) => (
-                      <div
-                        key={subtask.id}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
-                      >
-                        <Checkbox
-                          checked={subtask.is_done}
-                          onCheckedChange={(checked) =>
-                            handleToggleSubtask(subtask.id, checked as boolean)
-                          }
-                        />
-                        <span
-                          className={`text-sm flex-1 ${
-                            subtask.is_done
-                              ? "line-through text-gray-400"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {subtask.title}
-                        </span>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={subtasksHook.subtasks.map((s) => s.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {subtasksHook.subtasks.map((subtask) => (
+                          <SortableSubtask
+                            key={subtask.id}
+                            subtask={subtask}
+                            onToggle={handleToggleSubtask}
+                            onDelete={handleDeleteSubtask}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </CardContent>
             </Card>
@@ -628,7 +785,7 @@ export default function ObjectPage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {object.files.length === 0 ? (
+                {filesHook.files.length === 0 ? (
                   <EmptyState
                     icon={<FileText className="h-8 w-8" />}
                     title="No files"
@@ -642,10 +799,10 @@ export default function ObjectPage() {
                   />
                 ) : (
                   <div className="space-y-2">
-                    {object.files.map((file) => (
+                    {filesHook.files.map((file) => (
                       <div
                         key={file.id}
-                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer group"
                       >
                         <FileText className="h-8 w-8 text-blue-600 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -659,6 +816,14 @@ export default function ObjectPage() {
                             {file.mime_type && ` • ${file.mime_type}`}
                           </p>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => filesHook.unlinkFile(file.id)}
+                          className="opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -678,24 +843,11 @@ export default function ObjectPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {object.metadata && Object.keys(object.metadata).length > 0 ? (
-                  <div className="space-y-3">
-                    {Object.entries(object.metadata).map(([key, value]) => (
-                      <div key={key}>
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                          {key.replace(/_/g, " ")}
-                        </p>
-                        <p className="text-sm text-gray-900">{String(value)}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={<Settings className="h-8 w-8" />}
-                    title="No properties"
-                    description="Add custom properties to organize your object."
-                  />
-                )}
+                <MetadataEditor
+                  metadata={object.metadata || {}}
+                  onUpdate={handleMetadataUpdate}
+                  suggestions={metadataSuggestions}
+                />
               </CardContent>
             </Card>
 
@@ -714,7 +866,7 @@ export default function ObjectPage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {object.relations.length === 0 ? (
+                {relationsHook.relations.length === 0 ? (
                   <EmptyState
                     icon={<Link2 className="h-8 w-8" />}
                     title="No connections"
@@ -722,7 +874,7 @@ export default function ObjectPage() {
                   />
                 ) : (
                   <div className="space-y-2">
-                    {object.relations.map(({ relation, relatedObject }) => (
+                    {relationsHook.relations.map(({ relation, relatedObject }) => (
                       <div
                         key={relation.id}
                         onClick={() =>
@@ -730,14 +882,29 @@ export default function ObjectPage() {
                             `/projects/${projectId}/objects/${relatedObject.id}`
                           )
                         }
-                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer group"
                       >
-                        <p className="text-sm font-medium text-gray-900 mb-1">
-                          {relatedObject.title}
-                        </p>
-                        <p className="text-xs text-gray-500 capitalize">
-                          {relation.relation_kind.replace(/_/g, " ")}
-                        </p>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 mb-1">
+                              {relatedObject.title}
+                            </p>
+                            <p className="text-xs text-gray-500 capitalize">
+                              {relation.relation_kind.replace(/_/g, " ")}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              relationsHook.deleteRelation(relation.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -760,7 +927,7 @@ export default function ObjectPage() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {object.lexiconLinks.length === 0 ? (
+                {lexiconHook.lexiconLinks.length === 0 ? (
                   <EmptyState
                     icon={<Package className="h-8 w-8" />}
                     title="No lexicon items"
@@ -768,23 +935,42 @@ export default function ObjectPage() {
                   />
                 ) : (
                   <div className="space-y-2">
-                    {object.lexiconLinks.map(({ link, lexiconItem }) => (
+                    {lexiconHook.lexiconLinks.map(({ link, lexiconItem }) => (
                       <div
                         key={link.lexicon_id}
-                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                        className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
                       >
-                        <p className="text-sm font-medium text-gray-900 mb-1">
-                          {lexiconItem.name}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {lexiconItem.type.replace(/_/g, " ")}
-                          </Badge>
-                          {lexiconItem.manufacturer && (
-                            <p className="text-xs text-gray-500">
-                              {lexiconItem.manufacturer}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 mb-1">
+                              {lexiconItem.name}
                             </p>
-                          )}
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {lexiconItem.type.replace(/_/g, " ")}
+                              </Badge>
+                              {lexiconItem.manufacturer && (
+                                <p className="text-xs text-gray-500">
+                                  {lexiconItem.manufacturer}
+                                </p>
+                              )}
+                            </div>
+                            {link.note && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                {link.note}
+                              </p>
+                            )}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              lexiconHook.unlinkLexiconItem(link.lexicon_id)
+                            }
+                            className="opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
                         </div>
                       </div>
                     ))}
