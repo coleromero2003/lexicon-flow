@@ -56,11 +56,18 @@ export default function ObjectPage() {
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editSheetKey, setEditSheetKey] = useState(0);
-  const [editInitialValues, setEditInitialValues] = useState({
+  type EditInitialValues = {
+    title: string;
+    assignee: string;
+    dueDate: Date | undefined;
+    priority: PriorityValue;
+  };
+
+  const [editInitialValues, setEditInitialValues] = useState<EditInitialValues>({
     title: "",
     assignee: "",
-    dueDate: undefined as Date | undefined,
-    priority: PRIORITIES[1]?.value ?? ("medium" as PriorityValue),
+    dueDate: undefined,
+    priority: (PRIORITIES[1]?.value ?? "medium") as PriorityValue,
   });
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,7 +79,10 @@ export default function ObjectPage() {
       title: object.title,
       assignee: object.assignee || "",
       dueDate: object.due_date ? new Date(object.due_date) : undefined,
-      priority: (object.priority as PriorityValue) || "medium",
+      priority:
+        ((object.priority as PriorityValue) ||
+          PRIORITIES[1]?.value ||
+          "medium") as PriorityValue,
     });
   }, [object]);
 
