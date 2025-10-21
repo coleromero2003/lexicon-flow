@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Loader2, Plus, Trash2 } from "lucide-react";
 
 interface FileInfo {
   id: number;
@@ -22,9 +22,15 @@ interface FilesCardProps {
   files: FileInfo[];
   onUpload?: () => void;
   onUnlink: (fileId: number) => Promise<void>;
+  isUploading?: boolean;
 }
 
-export function FilesCard({ files, onUpload, onUnlink }: FilesCardProps) {
+export function FilesCard({
+  files,
+  onUpload,
+  onUnlink,
+  isUploading = false,
+}: FilesCardProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -35,9 +41,23 @@ export function FilesCard({ files, onUpload, onUnlink }: FilesCardProps) {
           </CardTitle>
           <CardDescription>Attached documents and files</CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={onUpload}>
-          <Plus className="h-4 w-4 mr-1" />
-          Upload
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onUpload}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              Uploading
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-1" />
+              Upload
+            </>
+          )}
         </Button>
       </CardHeader>
       <CardContent>
@@ -47,9 +67,23 @@ export function FilesCard({ files, onUpload, onUnlink }: FilesCardProps) {
             title="No files"
             description="Upload documents, images, or other files related to this object."
             action={
-              <Button size="sm" variant="outline" onClick={onUpload}>
-                <Plus className="h-4 w-4 mr-1" />
-                Upload File
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onUpload}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Uploading
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Upload File
+                  </>
+                )}
               </Button>
             }
           />
