@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, FileText } from "lucide-react";
@@ -29,6 +30,7 @@ import { useObjectRelations } from "@/lib/hooks/useObjectRelations";
 import { useObjectLexicon } from "@/lib/hooks/useObjectLexicon";
 import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
+import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService } from "@/lib/services";
 
@@ -46,13 +48,15 @@ export default function ObjectPage() {
 
   const { object, loading, error, updateObject } = useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
-  const filesHook = useObjectFiles(parsedObjectId);
+  const { files: objectFiles, unlinkFile, reloadFiles } =
+    useObjectFiles(parsedObjectId);
   const relationsHook = useObjectRelations(parsedObjectId);
   const lexiconHook = useObjectLexicon(parsedObjectId);
   const { users: organizationUsers } = useOrganizationUsers();
   const { suggestions: metadataSuggestions } = useMetadataSuggestions(
     parsedProjectId
   );
+  const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editSheetKey, setEditSheetKey] = useState(0);
@@ -71,6 +75,7 @@ export default function ObjectPage() {
   });
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!object) return;
@@ -207,7 +212,7 @@ export default function ObjectPage() {
 
   const handleUnlinkFile = async (fileId: number) => {
     try {
-      await filesHook.unlinkFile(fileId);
+      await unlinkFile(fileId);
       toast.success("File removed");
     } catch (err) {
       console.error("Failed to unlink file", err);
@@ -215,6 +220,45 @@ export default function ObjectPage() {
       throw err;
     }
   };
+
+  const handleUploadClick = useCallback(() => {
+    if (isUploadingFile) return;
+    fileInputRef.current?.click();
+  }, [isUploadingFile]);
+
+  const handleFileSelected = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+
+      if (!file) return;
+
+      if (!object) {
+        toast.error("Object data is still loading");
+        event.target.value = "";
+        return;
+      }
+
+      try {
+        await uploadObjectFile({
+          file,
+          projectId: parsedProjectId,
+          objectId: parsedObjectId,
+          objectSlug: object.title,
+        });
+
+        await reloadFiles();
+        toast.success("File uploaded");
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload file"
+        );
+      } finally {
+        event.target.value = "";
+      }
+    },
+    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+  );
 
   const handleDeleteRelation = async (relationId: number) => {
     try {
@@ -286,6 +330,13 @@ export default function ObjectPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar boardTitle={object.title} />
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        onChange={handleFileSelected}
+        className="hidden"
+      />
+
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <ObjectHeader
           object={object}
@@ -314,7 +365,12 @@ export default function ObjectPage() {
               onReorder={handleReorderSubtasks}
             />
 
-            <FilesCard files={filesHook.files} onUnlink={handleUnlinkFile} />
+            <FilesCard
+              files={objectFiles}
+              onUpload={handleUploadClick}
+              onUnlink={handleUnlinkFile}
+              isUploading={isUploadingFile}
+            />
           </div>
 
           <div className="space-y-6">
