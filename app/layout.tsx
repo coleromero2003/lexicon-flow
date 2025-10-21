@@ -6,6 +6,7 @@ import SupabaseProvider from "@/lib/supabase/SupabaseProvider";
 import CookieNotice from "@/components/cookie-notice";
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Toaster } from "@/components/ui/sonner"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
           <CookieNotice/>
           <Analytics/>
           <SpeedInsights/>
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>

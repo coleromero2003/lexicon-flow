@@ -170,7 +170,8 @@ function DroppableStep({
   );
 }
 
-function SortableObject({ object }: { object: ScadaObject }) {
+function SortableObject({ object, projectId }: { object: ScadaObject; projectId: string }) {
+  const router = useRouter();
   const {
     attributes,
     listeners,
@@ -200,9 +201,16 @@ function SortableObject({ object }: { object: ScadaObject }) {
         return "bg-yellow-500";
     }
   }
+
+  const handleClick = () => {
+    // Prevent navigation when dragging
+    if (isDragging) return;
+    router.push(`/projects/${projectId}/objects/${object.id}`);
+  };
+
   return (
     <div ref={setNodeRef} style={styles} {...listeners} {...attributes}>
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
+      <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleClick}>
         <CardContent className="p-3 sm:p-4">
           <div className="space-y-2 sm:space-y-3">
             {/* Object Header */}
@@ -834,7 +842,7 @@ export default function WorkflowPage() {
                   >
                     <div className="space-y-3">
                       {step.objects.map((obj, key) => (
-                        <SortableObject object={obj} key={key} />
+                        <SortableObject object={obj} projectId={projectId} key={key} />
                       ))}
                     </div>
                   </SortableContext>

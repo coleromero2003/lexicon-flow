@@ -29,11 +29,11 @@ export default function Navbar({
   const { isSignedIn, user } = useUser();
   const pathname = usePathname();
 
-  const isDashboardPage = pathname === "/dashboard";
+  const isProjectsPage = pathname === "/projects" || pathname === "/dashboard";
   const isBoardPage = pathname.startsWith("/boards/");
   const isWorkflowsPage = pathname === "/workflows" || pathname.startsWith("/workflows/");
 
-  if (isDashboardPage) {
+  if (isProjectsPage) {
     return (
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
@@ -84,7 +84,7 @@ export default function Navbar({
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              <Link href="/dashboard">
+              <Link href="/projects">
                 <Button variant="ghost" size="sm" className="hidden sm:flex">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Dashboard
@@ -126,7 +126,7 @@ export default function Navbar({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
               <Link
-                href="/dashboard"
+                href="/projects"
                 className="flex items-center space-x-1 sm:space-x-2 text-gray-600 hover:text-gray-900 flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -199,7 +199,7 @@ export default function Navbar({
               <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">
                 Welcome, {user.firstName ?? user.emailAddresses[0].emailAddress}
               </span>
-              <Link href="/dashboard">
+              <Link href="/projects">
                 <Button size="sm" className="text-xs sm:text-sm">
                   Go to Dashboard <ArrowRight />
                 </Button>

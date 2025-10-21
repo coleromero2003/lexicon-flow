@@ -43,10 +43,10 @@ export default function OrganizationPage() {
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <div className="mb-6">
-          <Link href="/dashboard">
+          <Link href="/projects">
             <Button variant="ghost" size="sm" className="mb-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to Projects
             </Button>
           </Link>
 
@@ -80,7 +80,7 @@ export default function OrganizationPage() {
                   card: "shadow-lg",
                 },
               }}
-              afterCreateOrganizationUrl="/dashboard"
+              afterCreateOrganizationUrl="/projects"
             />
           )}
         </div>

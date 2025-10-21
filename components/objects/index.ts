@@ -1,8 +1,11 @@
 export { ObjectHeader } from "./object-header";
-export { ObjectDescription } from "./object-description";
-export { ObjectMetadataCard } from "./object-metadata-card";
-export { ObjectRelationsCard } from "./object-relations-card";
-export type { RelationDisplayItem } from "./object-relations-card";
-export { ObjectSubtasksCard } from "./object-subtasks-card";
-export { ObjectFilesCard } from "./object-files-card";
-export { ObjectLexiconCard } from "./object-lexicon-card";
+export { EditObjectSheet } from "./edit-object-sheet";
+export { DescriptionCard } from "./description-card";
+export { WorkflowsCard } from "./workflows-card";
+export { SubtasksCard } from "./subtasks-card";
+export { FilesCard } from "./files-card";
+export { PropertiesCard } from "./properties-card";
+export { ConnectionsCard } from "./connections-card";
+export { LexiconCard } from "./lexicon-card";
+export { PRIORITIES, getPriorityColor } from "./constants";
+export type { PriorityValue } from "./constants";
