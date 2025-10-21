@@ -5,6 +5,33 @@ import { createClient } from "@supabase/supabase-js";
 beforeAll(() => {
   // You can add global setup here if needed
   console.log("Setting up test environment...");
+
+  if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+    class TestResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: TestResizeObserver,
+    });
+
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: TestResizeObserver,
+    });
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    !window.HTMLElement.prototype.scrollIntoView
+  ) {
+    window.HTMLElement.prototype.scrollIntoView = () => {};
+  }
 });
 
 afterAll(() => {
