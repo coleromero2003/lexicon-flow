@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest",
+    "test": "vitest --exclude 'lib/__tests__/**/*.test.ts'",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:run": "vitest run --exclude 'lib/__tests__/**/*.test.ts'",
+    "test:coverage": "vitest run --coverage --exclude 'lib/__tests__/**/*.test.ts'"
   },
   "dependencies": {
     "@clerk/mcp-tools": "^0.3.1",

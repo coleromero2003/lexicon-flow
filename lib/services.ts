@@ -211,6 +211,32 @@ export const objectService = {
     return data || [];
   },
 
+  async getObjectById(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ScadaObject | null> {
+    const { data, error } = await supabase
+      .from("objects")
+      .select("*")
+      .eq("id", objectId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ?? null;
+  },
+
+  async getObjectsByIds(
+    supabase: SupabaseClient,
+    objectIds: number[]
+  ): Promise<ScadaObject[]> {
+    if (objectIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("objects")
+      .select("*")
+      .in("id", objectIds);
+    if (error) throw error;
+    return data ?? [];
+  },
+
   async createObject(
     supabase: SupabaseClient,
     obj: Omit<ScadaObject, "id" | "created_at" | "updated_at">
