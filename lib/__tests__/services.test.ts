@@ -180,7 +180,7 @@ describe("Object Services", () => {
   let supabase: SupabaseClient;
   let testOrgId: string;
   let testProjectId: number;
-  let createdObjectId: number;
+  let createdObjectId = 0;
 
   beforeEach(async () => {
     supabase = createTestSupabaseClient();
@@ -203,6 +203,7 @@ describe("Object Services", () => {
   afterEach(async () => {
     if (createdObjectId) {
       await supabase.from("objects").delete().eq("id", createdObjectId);
+      createdObjectId = 0;
     }
     if (testProjectId) {
       await supabase.from("projects").delete().eq("id", testProjectId);
@@ -269,6 +270,97 @@ describe("Object Services", () => {
 
       expect(objects).toBeDefined();
       expect(Array.isArray(objects)).toBe(true);
+    });
+  });
+
+  describe("getObjectById", () => {
+    beforeEach(async () => {
+      const obj = await objectService.createObject(supabase, {
+        project_id: testProjectId,
+        workflow_id: null,
+        step_id: null,
+        title: "Single Object",
+        description_md: null,
+        assignee: null,
+        due_date: null,
+        priority: "medium",
+        sort_order: 0,
+        metadata: null,
+      });
+      createdObjectId = obj.id;
+    });
+
+    it("should return an object when it exists", async () => {
+      const obj = await objectService.getObjectById(
+        supabase,
+        createdObjectId
+      );
+
+      expect(obj).toBeDefined();
+      expect(obj?.id).toBe(createdObjectId);
+      expect(obj?.title).toBe("Single Object");
+    });
+
+    it("should return null when object is missing", async () => {
+      const obj = await objectService.getObjectById(supabase, 999999);
+      expect(obj).toBeNull();
+    });
+  });
+
+  describe("getObjectsByIds", () => {
+    let secondObjectId = 0;
+
+    beforeEach(async () => {
+      const obj = await objectService.createObject(supabase, {
+        project_id: testProjectId,
+        workflow_id: null,
+        step_id: null,
+        title: "Batch Object",
+        description_md: null,
+        assignee: null,
+        due_date: null,
+        priority: "low",
+        sort_order: 1,
+        metadata: null,
+      });
+      createdObjectId = obj.id;
+
+      const obj2 = await objectService.createObject(supabase, {
+        project_id: testProjectId,
+        workflow_id: null,
+        step_id: null,
+        title: "Batch Object 2",
+        description_md: null,
+        assignee: null,
+        due_date: null,
+        priority: "low",
+        sort_order: 2,
+        metadata: null,
+      });
+      secondObjectId = obj2.id;
+    });
+
+    afterEach(async () => {
+      if (secondObjectId) {
+        await supabase.from("objects").delete().eq("id", secondObjectId);
+        secondObjectId = 0;
+      }
+    });
+
+    it("should return all objects matching provided IDs", async () => {
+      const results = await objectService.getObjectsByIds(supabase, [
+        createdObjectId,
+        secondObjectId,
+      ]);
+
+      const ids = results.map((obj) => obj.id);
+      expect(ids).toContain(createdObjectId);
+      expect(ids).toContain(secondObjectId);
+    });
+
+    it("should return empty array when ids list empty", async () => {
+      const results = await objectService.getObjectsByIds(supabase, []);
+      expect(results).toEqual([]);
     });
   });
 });
