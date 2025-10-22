@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, FileText } from "lucide-react";
 
 import Navbar from "@/components/navbar";
+import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +25,7 @@ import {
   PriorityValue,
 } from "@/components/objects";
 import { useObject } from "@/lib/hooks/useObjects";
+import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { useSubtasks } from "@/lib/hooks/useSubtasks";
 import { useObjectFiles } from "@/lib/hooks/useObjectFiles";
 import { useObjectRelations } from "@/lib/hooks/useObjectRelations";
@@ -76,6 +78,34 @@ export default function ObjectPage() {
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const storageBucket = useMemo(
+    () =>
+      process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ||
+      "files",
+    []
+  );
+
+  const handleFileViewerError = useCallback((error: Error) => {
+    console.error("Failed to open file", error);
+    toast.error(error.message || "Failed to open file");
+  }, []);
+
+  const {
+    openFile: openObjectFile,
+    setViewerOpen,
+    state: {
+      isViewerOpen,
+      viewerFile,
+      viewerUrl,
+      viewerLoading,
+      viewingFileId,
+    },
+  } = useSupabaseFileViewer({
+    supabase,
+    bucket: storageBucket,
+    onError: handleFileViewerError,
+  });
 
   useEffect(() => {
     if (!object) return;
@@ -260,6 +290,8 @@ export default function ObjectPage() {
     [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
   );
 
+  const handleViewFile = openObjectFile;
+
   const handleDeleteRelation = async (relationId: number) => {
     try {
       await relationsHook.deleteRelation(relationId);
@@ -369,7 +401,9 @@ export default function ObjectPage() {
               files={objectFiles}
               onUpload={handleUploadClick}
               onUnlink={handleUnlinkFile}
+              onView={handleViewFile}
               isUploading={isUploadingFile}
+              viewingFileId={viewingFileId}
             />
           </div>
 
@@ -406,6 +440,14 @@ export default function ObjectPage() {
           name,
         }))}
         onSave={handleSaveEdit}
+      />
+
+      <PdfViewerDialog
+        open={isViewerOpen}
+        onOpenChange={setViewerOpen}
+        file={viewerFile}
+        url={viewerUrl}
+        loading={viewerLoading}
       />
     </div>
   );
