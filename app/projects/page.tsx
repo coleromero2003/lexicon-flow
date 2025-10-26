@@ -309,62 +309,7 @@ export default function ProjectsPage() {
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredProjects.map((project) => (
-                <Link
-                  href={`/projects/${project.id}/workflows`}
-                  key={project.id}
-                >
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div className="w-4 h-4 bg-blue-500 rounded" />
-                        <Badge className="text-xs" variant="secondary">
-                          {project.status}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 sm:p-6">
-                      <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
-                        {project.name}
-                      </CardTitle>
-                      {project.code && (
-                        <Badge variant="outline" className="mb-2">
-                          {project.code}
-                        </Badge>
-                      )}
-                      <CardDescription className="text-sm mb-4">
-                        {project.description || "No description"}
-                      </CardDescription>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500 space-y-1 sm:space-y-0">
-                        <span>
-                          Created{" "}
-                          {new Date(project.created_at).toLocaleDateString()}
-                        </span>
-                        <span>
-                          Updated{" "}
-                          {new Date(project.updated_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-
-              <Card
-                className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors cursor-pointer group"
-                onClick={() => setIsCreatingProject(true)}
-              >
-                <CardContent className="p-4 sm:p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
-                  <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 group-hover:text-blue-600 mb-2" />
-                  <p className="text-sm sm:text-base text-gray-600 group-hover:text-blue-600 font-medium">
-                    Create new project
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div>
-              {filteredProjects.map((project, key) => (
-                <div key={key} className={key > 0 ? "mt-4" : ""}>
+                <div key={project.id} className="space-y-2">
                   <Link href={`/projects/${project.id}/workflows`}>
                     <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
                       <CardHeader className="pb-3">
@@ -400,6 +345,103 @@ export default function ProjectsPage() {
                       </CardContent>
                     </Card>
                   </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/projects/${project.id}/workflows`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                      >
+                        Workflows
+                      </Button>
+                    </Link>
+                    <Link href={`/projects/${project.id}/graph`}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                      >
+                        Graph view
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+
+              <Card
+                className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors cursor-pointer group"
+                onClick={() => setIsCreatingProject(true)}
+              >
+                <CardContent className="p-4 sm:p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
+                  <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400 group-hover:text-blue-600 mb-2" />
+                  <p className="text-sm sm:text-base text-gray-600 group-hover:text-blue-600 font-medium">
+                    Create new project
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div>
+              {filteredProjects.map((project, index) => (
+                <div
+                  key={project.id}
+                  className={`space-y-2 ${index > 0 ? "mt-4" : ""}`}
+                >
+                  <Link href={`/projects/${project.id}/workflows`}>
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="w-4 h-4 bg-blue-500 rounded" />
+                          <Badge className="text-xs" variant="secondary">
+                            {project.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
+                          {project.name}
+                        </CardTitle>
+                        {project.code && (
+                          <Badge variant="outline" className="mb-2">
+                            {project.code}
+                          </Badge>
+                        )}
+                        <CardDescription className="text-sm mb-4">
+                          {project.description || "No description"}
+                        </CardDescription>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500 space-y-1 sm:space-y-0">
+                          <span>
+                            Created{" "}
+                            {new Date(project.created_at).toLocaleDateString()}
+                          </span>
+                          <span>
+                            Updated{" "}
+                            {new Date(project.updated_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/projects/${project.id}/workflows`}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                      >
+                        Workflows
+                      </Button>
+                    </Link>
+                    <Link href={`/projects/${project.id}/graph`}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 sm:flex-none"
+                      >
+                        Graph view
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               ))}
 
