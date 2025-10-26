@@ -50,14 +50,17 @@ export default function ObjectPage() {
 
   const { object, loading, error, updateObject } = useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
-  const { files: objectFiles, unlinkFile, reloadFiles } =
-    useObjectFiles(parsedObjectId);
+  const {
+    files: objectFiles,
+    deleteFile,
+    unlinkFile,
+    reloadFiles,
+  } = useObjectFiles(parsedObjectId);
   const relationsHook = useObjectRelations(parsedObjectId);
   const lexiconHook = useObjectLexicon(parsedObjectId);
   const { users: organizationUsers } = useOrganizationUsers();
-  const { suggestions: metadataSuggestions } = useMetadataSuggestions(
-    parsedProjectId
-  );
+  const { suggestions: metadataSuggestions } =
+    useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
@@ -69,20 +72,20 @@ export default function ObjectPage() {
     priority: PriorityValue;
   };
 
-  const [editInitialValues, setEditInitialValues] = useState<EditInitialValues>({
-    title: "",
-    assignee: "",
-    dueDate: undefined,
-    priority: (PRIORITIES[1]?.value ?? "medium") as PriorityValue,
-  });
+  const [editInitialValues, setEditInitialValues] = useState<EditInitialValues>(
+    {
+      title: "",
+      assignee: "",
+      dueDate: undefined,
+      priority: (PRIORITIES[1]?.value ?? "medium") as PriorityValue,
+    }
+  );
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const storageBucket = useMemo(
-    () =>
-      process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ||
-      "files",
+    () => "lexicon-files",
     []
   );
 
@@ -114,10 +117,9 @@ export default function ObjectPage() {
       title: object.title,
       assignee: object.assignee || "",
       dueDate: object.due_date ? new Date(object.due_date) : undefined,
-      priority:
-        ((object.priority as PriorityValue) ||
-          PRIORITIES[1]?.value ||
-          "medium") as PriorityValue,
+      priority: ((object.priority as PriorityValue) ||
+        PRIORITIES[1]?.value ||
+        "medium") as PriorityValue,
     });
   }, [object]);
 
@@ -218,7 +220,9 @@ export default function ObjectPage() {
     }
   };
 
-  const handleReorderSubtasks = async (reordered: typeof subtasksHook.subtasks) => {
+  const handleReorderSubtasks = async (
+    reordered: typeof subtasksHook.subtasks
+  ) => {
     try {
       await subtasksHook.reorderSubtasks(reordered);
       toast.success("Subtasks reordered");
@@ -243,10 +247,21 @@ export default function ObjectPage() {
   const handleUnlinkFile = async (fileId: number) => {
     try {
       await unlinkFile(fileId);
-      toast.success("File removed");
+      toast.success("File unlinked");
     } catch (err) {
       console.error("Failed to unlink file", err);
       toast.error("Failed to unlink file");
+      throw err;
+    }
+  };
+
+  const handleDeleteFile = async (fileId: number) => {
+    try {
+      await deleteFile(fileId);
+      toast.success("File deleted permanently");
+    } catch (err) {
+      console.error("Failed to delete file", err);
+      toast.error("Failed to delete file");
       throw err;
     }
   };
@@ -401,6 +416,7 @@ export default function ObjectPage() {
               files={objectFiles}
               onUpload={handleUploadClick}
               onUnlink={handleUnlinkFile}
+              onDelete={handleDeleteFile}
               onView={handleViewFile}
               isUploading={isUploadingFile}
               viewingFileId={viewingFileId}

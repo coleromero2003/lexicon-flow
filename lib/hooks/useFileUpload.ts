@@ -34,7 +34,7 @@ type UploadLexiconFileParams = {
   lexiconSlug?: string;
 };
 
-const DEFAULT_STORAGE_BUCKET = "files";
+const DEFAULT_STORAGE_BUCKET = "lexicon-files";
 
 function sanitizePathSegment(segment: string | number) {
   return String(segment)

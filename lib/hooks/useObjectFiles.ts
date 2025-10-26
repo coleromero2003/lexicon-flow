@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSupabase } from "../supabase/SupabaseProvider";
 import { FileMeta } from "../supabase/models";
-import { objectFileService } from "../services";
+import { objectFileService, fileService } from "../services";
 
 export function useObjectFiles(objectId: number) {
   const { supabase } = useSupabase();
@@ -71,12 +71,28 @@ export function useObjectFiles(objectId: number) {
     [supabase, objectId]
   );
 
+  const deleteFile = useCallback(
+    async (fileId: number) => {
+      if (!supabase) throw new Error("Supabase client not initialized");
+
+      try {
+        await fileService.deleteFile(supabase, fileId);
+        setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete file");
+        throw err;
+      }
+    },
+    [supabase]
+  );
+
   return {
     files,
     loading,
     error,
     linkFile,
     unlinkFile,
+    deleteFile,
     reloadFiles: loadFiles,
   };
 }

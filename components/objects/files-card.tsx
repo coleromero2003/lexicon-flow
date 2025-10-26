@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { FileText, Loader2, Plus, Trash2, Unlink } from "lucide-react";
 
 import type { FileMeta } from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
@@ -11,12 +12,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 
 interface FilesCardProps {
   files: FileMeta[];
   onUpload?: () => void;
-  onUnlink: (fileId: number) => Promise<void>;
+  onUnlink?: (fileId: number) => Promise<void>;
+  onDelete?: (fileId: number) => Promise<void>;
   onView?: (file: FileMeta) => void;
   isUploading?: boolean;
   viewingFileId?: number | null;
@@ -26,10 +38,35 @@ export function FilesCard({
   files,
   onUpload,
   onUnlink,
+  onDelete,
   onView,
   isUploading = false,
   viewingFileId = null,
 }: FilesCardProps) {
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: "unlink" | "delete";
+    file: FileMeta | null;
+  }>({
+    open: false,
+    action: "unlink",
+    file: null,
+  });
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.file) return;
+
+    try {
+      if (confirmDialog.action === "unlink" && onUnlink) {
+        await onUnlink(confirmDialog.file.id);
+      } else if (confirmDialog.action === "delete" && onDelete) {
+        await onDelete(confirmDialog.file.id);
+      }
+    } finally {
+      setConfirmDialog({ open: false, action: "unlink", file: null });
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -118,24 +155,101 @@ export function FilesCard({
                   {viewingFileId === file.id ? (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="opacity-0 transition-opacity group-hover:opacity-100"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onUnlink(file.id);
-                    }}
-                    aria-label={`Remove ${file.filename}`}
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
+                  {onUnlink && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDialog({
+                          open: true,
+                          action: "unlink",
+                          file,
+                        });
+                      }}
+                      aria-label={`Unlink ${file.filename}`}
+                    >
+                      <Unlink className="h-4 w-4 text-gray-600" />
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDialog({
+                          open: true,
+                          action: "delete",
+                          file,
+                        });
+                      }}
+                      aria-label={`Delete ${file.filename}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmDialog({ open: false, action: "unlink", file: null });
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog.action === "delete"
+                ? "Delete file permanently?"
+                : "Unlink file?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.action === "delete" ? (
+                <>
+                  This will permanently delete{" "}
+                  <span className="font-semibold">
+                    {confirmDialog.file?.filename}
+                  </span>{" "}
+                  from storage and remove it from all objects. This action
+                  cannot be undone.
+                </>
+              ) : (
+                <>
+                  This will remove the link to{" "}
+                  <span className="font-semibold">
+                    {confirmDialog.file?.filename}
+                  </span>{" "}
+                  from this object. The file will remain in storage and can be
+                  re-linked later.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAction}
+              className={
+                confirmDialog.action === "delete"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : ""
+              }
+            >
+              {confirmDialog.action === "delete" ? "Delete" : "Unlink"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

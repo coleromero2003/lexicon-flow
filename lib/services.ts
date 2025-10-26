@@ -413,6 +413,29 @@ export const fileService = {
     if (error) throw error;
     return data;
   },
+
+  async deleteFile(
+    supabase: SupabaseClient,
+    fileId: number
+  ): Promise<void> {
+    // First get the file metadata to access the storage_key
+    const file = await this.getFile(supabase, fileId);
+
+    // Delete from storage bucket
+    const { error: storageError } = await supabase.storage
+      .from("lexicon-files")
+      .remove([file.storage_key]);
+
+    if (storageError) throw storageError;
+
+    // Delete from database (this will cascade delete object_files and lexicon_files links)
+    const { error: dbError } = await supabase
+      .from("files")
+      .delete()
+      .eq("id", fileId);
+
+    if (dbError) throw dbError;
+  },
 };
 
 // =======================
