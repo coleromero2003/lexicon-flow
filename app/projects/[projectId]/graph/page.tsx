@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import Graph from "graphology";
-import Sigma from "sigma";
+import type Sigma from "sigma";
 import {
   ArrowLeft,
   Loader2,
@@ -21,7 +21,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
+import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import {
   fileService,
   lexiconFileService,
@@ -102,7 +114,7 @@ function buildGraph(data: GraphData) {
       y,
       size: 12,
       color: NODE_COLORS.object,
-      type: "object",
+      type: "circle",
     });
   });
 
@@ -115,7 +127,7 @@ function buildGraph(data: GraphData) {
       y,
       size: 8,
       color: NODE_COLORS.file,
-      type: "file",
+      type: "circle",
     });
   });
 
@@ -128,7 +140,7 @@ function buildGraph(data: GraphData) {
       y,
       size: 9,
       color: NODE_COLORS.lexicon,
-      type: "lexicon",
+      type: "circle",
     });
   });
 
@@ -204,9 +216,27 @@ export default function ProjectGraphPage() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState<boolean>(false);
+  const [selectedNode, setSelectedNode] = useState<{
+    type: "object" | "file" | "lexicon";
+    id: number;
+    label: string;
+  } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sigmaInstanceRef = useRef<Sigma | null>(null);
+
+  const {
+    openFile,
+    setViewerOpen,
+    state: { isViewerOpen, viewerFile, viewerUrl, viewerLoading },
+  } = useSupabaseFileViewer({
+    supabase,
+    bucket: "lexicon-files",
+    onError: (error) => {
+      console.error("Failed to open file", error);
+    },
+  });
 
   const fetchGraphData = useCallback(
     async (cancelRef?: { current: boolean }) => {
@@ -341,24 +371,76 @@ export default function ProjectGraphPage() {
       return;
     }
 
-    const graph = buildGraph(graphData);
-    const renderer = new Sigma(graph, containerRef.current, {
-      renderLabels: true,
-      labelDensity: 1,
-    });
-    sigmaInstanceRef.current = renderer;
+    let renderer: InstanceType<typeof Sigma> | null = null;
 
-    const handleResize = () => {
-      renderer.refresh();
+    // Dynamically import Sigma only on the client side
+    const initSigma = async () => {
+      const { default: SigmaConstructor } = await import("sigma");
+
+      if (!containerRef.current) return;
+
+      const graph = buildGraph(graphData);
+      renderer = new SigmaConstructor(graph, containerRef.current, {
+        renderLabels: true,
+        labelDensity: 1,
+      });
+      sigmaInstanceRef.current = renderer;
+
+      const handleNodeClick = async (event: { node: string }) => {
+        const nodeKey = event.node;
+        const [nodeType, nodeId] = nodeKey.split("-");
+        const id = Number(nodeId);
+
+        if (!Number.isNaN(id)) {
+          const nodeData = graph.getNodeAttributes(nodeKey);
+
+          // If it's a file, open the file viewer
+          if (nodeType === "file" && graphData) {
+            const fileData = graphData.files.find((f) => f.id === id);
+            if (fileData) {
+              await openFile(fileData);
+              return;
+            }
+          }
+
+          // For non-file nodes, show the navigation dialog
+          setSelectedNode({
+            type: nodeType as "object" | "file" | "lexicon",
+            id,
+            label: nodeData.label || nodeKey,
+          });
+          setDialogOpen(true);
+        }
+      };
+
+      renderer.on("clickNode", handleNodeClick);
+
+      const handleResize = () => {
+        renderer?.refresh();
+      };
+
+      window.addEventListener("resize", handleResize);
+
+      return () => {
+        window.removeEventListener("resize", handleResize);
+        if (renderer) {
+          renderer.off("clickNode", handleNodeClick);
+          renderer.kill();
+        }
+      };
     };
 
-    window.addEventListener("resize", handleResize);
+    let cleanup: (() => void) | undefined;
+
+    initSigma().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    });
+
     return () => {
-      window.removeEventListener("resize", handleResize);
-      renderer.kill();
+      cleanup?.();
       sigmaInstanceRef.current = null;
     };
-  }, [graphData, hasGraphNodes]);
+  }, [graphData, hasGraphNodes, openFile]);
 
   useEffect(() => {
     return () => {
@@ -389,6 +471,31 @@ export default function ProjectGraphPage() {
         : 0,
     [graphData]
   );
+
+  const handleNavigateToNode = () => {
+    if (!selectedNode) return;
+
+    let url = "";
+    switch (selectedNode.type) {
+      case "object":
+        // Navigate to object detail page (you may need to adjust this URL)
+        url = `/projects/${projectId}/objects/${selectedNode.id}`;
+        break;
+      case "file":
+        // Navigate to file detail page (you may need to adjust this URL)
+        url = `/projects/${projectId}/files/${selectedNode.id}`;
+        break;
+      case "lexicon":
+        // Navigate to lexicon item detail page (you may need to adjust this URL)
+        url = `/lexicon/${selectedNode.id}`;
+        break;
+    }
+
+    if (url) {
+      router.push(url);
+    }
+    setDialogOpen(false);
+  };
 
   if (!organization) {
     return (
@@ -584,6 +691,37 @@ export default function ProjectGraphPage() {
           </CardContent>
         </Card>
       </main>
+
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Navigate to {selectedNode?.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to go to the detail page for this{" "}
+              {selectedNode?.type === "object"
+                ? "object"
+                : selectedNode?.type === "file"
+                  ? "file"
+                  : "lexicon item"}
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleNavigateToNode}>
+              Go to page
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <PdfViewerDialog
+        open={isViewerOpen}
+        onOpenChange={setViewerOpen}
+        file={viewerFile}
+        url={viewerUrl}
+        loading={viewerLoading}
+      />
     </div>
   );
 }
