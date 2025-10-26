@@ -299,6 +299,26 @@ export const objectRelationService = {
     return data || [];
   },
 
+  async getRelationsForObjects(
+    supabase: SupabaseClient,
+    objectIds: number[]
+  ): Promise<ObjectRelation[]> {
+    const uniqueIds = Array.from(new Set(objectIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const idList = uniqueIds.join(",");
+    const { data, error } = await supabase
+      .from("object_relations")
+      .select("*")
+      .or(
+        `src_object_id.in.(${idList}),dst_object_id.in.(${idList})`
+      );
+    if (error) throw error;
+    return data || [];
+  },
+
   async createRelation(
     supabase: SupabaseClient,
     relation: Omit<ObjectRelation, "id" | "created_at">
@@ -401,6 +421,23 @@ export const fileService = {
     return data || [];
   },
 
+  async getFilesByIds(
+    supabase: SupabaseClient,
+    fileIds: number[]
+  ): Promise<FileMeta[]> {
+    const uniqueIds = Array.from(new Set(fileIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("files")
+      .select("*")
+      .in("id", uniqueIds);
+    if (error) throw error;
+    return data || [];
+  },
+
   async uploadFileMeta(
     supabase: SupabaseClient,
     file: Omit<FileMeta, "id" | "created_at">
@@ -474,6 +511,23 @@ export const objectFileService = {
     const typedData = data as { files: FileMeta[] }[] | null;
     return typedData?.flatMap((r) => r.files) ?? [];
   },
+
+  async getLinksForObjects(
+    supabase: SupabaseClient,
+    objectIds: number[]
+  ): Promise<ObjectFileLink[]> {
+    const uniqueIds = Array.from(new Set(objectIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("object_files")
+      .select("*")
+      .in("object_id", uniqueIds);
+    if (error) throw error;
+    return data || [];
+  },
 };
 
 // =======================
@@ -512,6 +566,23 @@ export const objectLexiconService = {
     const typedData = data as { lexicon_items: LexiconItem[] }[] | null;
     return typedData?.flatMap((r) => r.lexicon_items) ?? [];
   },
+
+  async getLinksForObjects(
+    supabase: SupabaseClient,
+    objectIds: number[]
+  ): Promise<ObjectLexiconLink[]> {
+    const uniqueIds = Array.from(new Set(objectIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("object_lexicon_links")
+      .select("*")
+      .in("object_id", uniqueIds);
+    if (error) throw error;
+    return data || [];
+  },
 };
 
 // =======================
@@ -541,6 +612,24 @@ export const lexiconService = {
       .select("*")
       .eq("org_id", orgId)
       .eq("type", type)
+      .order("name", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getLexiconItemsByIds(
+    supabase: SupabaseClient,
+    lexiconIds: number[]
+  ): Promise<LexiconItem[]> {
+    const uniqueIds = Array.from(new Set(lexiconIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .select("*")
+      .in("id", uniqueIds)
       .order("name", { ascending: true });
     if (error) throw error;
     return data || [];
@@ -583,5 +672,22 @@ export const lexiconFileService = {
     if (error) throw error;
     const typedData = data as { files: FileMeta[] }[] | null;
     return typedData?.flatMap((r) => r.files) ?? [];
+  },
+
+  async getLinksForLexiconIds(
+    supabase: SupabaseClient,
+    lexiconIds: number[]
+  ): Promise<LexiconFileLink[]> {
+    const uniqueIds = Array.from(new Set(lexiconIds));
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("lexicon_files")
+      .select("*")
+      .in("lexicon_id", uniqueIds);
+    if (error) throw error;
+    return data || [];
   },
 };

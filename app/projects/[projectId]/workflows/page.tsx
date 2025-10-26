@@ -30,6 +30,7 @@ import {
   List,
   Plus,
   Search,
+  Share2,
   Workflow as WorkflowIcon,
   ArrowLeft,
 } from "lucide-react";
@@ -130,21 +131,33 @@ export default function WorkflowsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-6 sm:mb-8 space-y-4">
           <Button
             variant="ghost"
-            className="mb-4"
+            className="mb-0 w-fit"
             onClick={() => router.push("/projects")}
           >
             <ArrowLeft className="mr-2" />
             Back to Projects
           </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Workflows for {projectName} 🔄
-          </h1>
-          <p className="text-gray-600">
-            Manage your workflows and their steps.
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                Workflows for {projectName} 🔄
+              </h1>
+              <p className="text-gray-600">
+                Manage your workflows and their steps.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link href={`/projects/${projectId}/graph`}>
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Share2 className="h-4 w-4" />
+                  System graph
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Stats */}
