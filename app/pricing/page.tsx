@@ -14,7 +14,7 @@ export default function PricingPage() {
           </p>
         </div>
         <div className="max-w-5xl mx-auto">
-          <PricingTable newSubscriptionRedirectUrl="/dashboard" />
+          <PricingTable newSubscriptionRedirectUrl="/projects" />
         </div>
       </div>
     </div>

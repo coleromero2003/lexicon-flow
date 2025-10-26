@@ -140,6 +140,19 @@ export const workflowService = {
 // STEP SERVICES
 // =======================
 export const stepService = {
+  async getStep(
+    supabase: SupabaseClient,
+    stepId: number
+  ): Promise<Step> {
+    const { data, error } = await supabase
+      .from("steps")
+      .select("*")
+      .eq("id", stepId)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getStepsByWorkflow(
     supabase: SupabaseClient,
     workflowId: number
@@ -186,6 +199,19 @@ export const stepService = {
 // OBJECT SERVICES
 // =======================
 export const objectService = {
+  async getObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ScadaObject> {
+    const { data, error } = await supabase
+      .from("objects")
+      .select("*")
+      .eq("id", objectId)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getObjectsByProject(
     supabase: SupabaseClient,
     projectId: number
@@ -291,6 +317,19 @@ export const objectRelationService = {
 // OBJECT SUBTASKS
 // =======================
 export const objectSubtaskService = {
+  async getSubtasksByObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ObjectSubtask[]> {
+    const { data, error } = await supabase
+      .from("object_subtasks")
+      .select("*")
+      .eq("object_id", objectId)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
   async getSubtasks(
     supabase: SupabaseClient,
     objectId: number
@@ -316,12 +355,40 @@ export const objectSubtaskService = {
     if (error) throw error;
     return data;
   },
+
+  async updateSubtask(
+    supabase: SupabaseClient,
+    subtaskId: number,
+    updates: Partial<ObjectSubtask>
+  ): Promise<ObjectSubtask> {
+    const { data, error } = await supabase
+      .from("object_subtasks")
+      .update(updates)
+      .eq("id", subtaskId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };
 
 // =======================
 // FILE SERVICES
 // =======================
 export const fileService = {
+  async getFile(
+    supabase: SupabaseClient,
+    fileId: number
+  ): Promise<FileMeta> {
+    const { data, error } = await supabase
+      .from("files")
+      .select("*")
+      .eq("id", fileId)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getFilesByProject(
     supabase: SupabaseClient,
     projectId: number
@@ -346,6 +413,29 @@ export const fileService = {
     if (error) throw error;
     return data;
   },
+
+  async deleteFile(
+    supabase: SupabaseClient,
+    fileId: number
+  ): Promise<void> {
+    // First get the file metadata to access the storage_key
+    const file = await this.getFile(supabase, fileId);
+
+    // Delete from storage bucket
+    const { error: storageError } = await supabase.storage
+      .from("lexicon-files")
+      .remove([file.storage_key]);
+
+    if (storageError) throw storageError;
+
+    // Delete from database (this will cascade delete object_files and lexicon_files links)
+    const { error: dbError } = await supabase
+      .from("files")
+      .delete()
+      .eq("id", fileId);
+
+    if (dbError) throw dbError;
+  },
 };
 
 // =======================
@@ -358,6 +448,18 @@ export const objectFileService = {
   ): Promise<void> {
     const { error } = await supabase.from("object_files").insert(link);
     if (error) throw error;
+  },
+
+  async getFilesByObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ObjectFileLink[]> {
+    const { data, error } = await supabase
+      .from("object_files")
+      .select("*")
+      .eq("object_id", objectId);
+    if (error) throw error;
+    return data || [];
   },
 
   async getFilesForObject(
@@ -386,6 +488,18 @@ export const objectLexiconService = {
     if (error) throw error;
   },
 
+  async getLexiconByObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<ObjectLexiconLink[]> {
+    const { data, error } = await supabase
+      .from("object_lexicon_links")
+      .select("*")
+      .eq("object_id", objectId);
+    if (error) throw error;
+    return data || [];
+  },
+
   async getLexiconForObject(
     supabase: SupabaseClient,
     objectId: number
@@ -404,6 +518,19 @@ export const objectLexiconService = {
 // LEXICON SERVICES
 // =======================
 export const lexiconService = {
+  async getLexiconItem(
+    supabase: SupabaseClient,
+    lexiconId: number
+  ): Promise<LexiconItem> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .select("*")
+      .eq("id", lexiconId)
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getLexiconItemsByType(
     supabase: SupabaseClient,
     orgId: string,
