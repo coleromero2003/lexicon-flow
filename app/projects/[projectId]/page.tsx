@@ -9,6 +9,14 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -17,7 +25,6 @@ import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
 import { FileMeta, Project, ScadaObject, Workflow } from "@/lib/supabase/models";
 import {
-  ArrowLeft,
   FolderKanban,
   LayoutDashboard,
   ListTree,
@@ -195,21 +202,32 @@ export default function ProjectDashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="container mx-auto px-4 py-6 sm:py-8 space-y-8">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{project.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              className="w-fit px-0"
-              onClick={() => router.push("/projects")}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
-            </Button>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{project.name}</h1>
-              <p className="text-gray-600">
-                Overview of workflows, objects, and files in this project.
-              </p>
-            </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{project.name}</h1>
+            <p className="text-gray-600">
+              Overview of workflows, objects, and files in this project.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="default" className="flex items-center gap-2" disabled>
@@ -357,18 +375,23 @@ export default function ProjectDashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <ListTree className="h-5 w-5 text-emerald-500" /> Objects
-            </CardTitle>
-            <CardDescription>
-              Key SCADA objects that belong to this project.
-            </CardDescription>
+          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <ListTree className="h-5 w-5 text-emerald-500" /> Objects
+              </CardTitle>
+              <CardDescription>
+                Key SCADA objects that belong to this project.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/objects`)}>
+              Manage objects
+            </Button>
           </CardHeader>
           <CardContent>
             {filteredObjects.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {filteredObjects.map((object) => (
+                {filteredObjects.slice(0, 6).map((object) => (
                   <Link
                     key={object.id}
                     href={`/projects/${projectId}/objects/${object.id}`}
@@ -400,6 +423,13 @@ export default function ProjectDashboardPage() {
                     : "Objects will appear here once they are created for the project."
                 }
               />
+            )}
+            {filteredObjects.length > 6 && (
+              <div className="mt-4">
+                <Button variant="outline" className="w-full" onClick={() => router.push(`/projects/${projectId}/objects`)}>
+                  View all objects ({filteredObjects.length})
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

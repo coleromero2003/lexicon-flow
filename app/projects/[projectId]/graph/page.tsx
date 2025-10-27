@@ -5,8 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import Graph from "graphology";
 import type Sigma from "sigma";
+import Link from "next/link";
 import {
-  ArrowLeft,
   Loader2,
   RefreshCcw,
 } from "lucide-react";
@@ -20,6 +20,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   AlertDialog,
@@ -532,17 +540,33 @@ export default function ProjectGraphPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8 space-y-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="pl-0"
-            onClick={() => router.push(`/projects/${projectId}/workflows`)}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to workflows
-          </Button>
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={`/projects/${projectId}`}>{projectName}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Graph</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
+        <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
@@ -564,13 +588,6 @@ export default function ProjectGraphPage() {
                   className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
                 />
                 Refresh
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.push("/projects")}
-              >
-                Projects overview
               </Button>
             </div>
           </div>

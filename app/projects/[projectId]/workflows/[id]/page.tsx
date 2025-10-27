@@ -5,6 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -23,9 +31,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWorkflow } from "@/lib/hooks/useWorkflows";
 import { StepWithObjects, ScadaObject } from "@/lib/supabase/models";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import { Calendar, MoreHorizontal, Plus, User, ArrowLeft } from "lucide-react";
+import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 import {
   DndContext,
   DragEndEvent,
@@ -723,14 +732,37 @@ export default function WorkflowPage() {
 
         {/* Workflow Content */}
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-          <Button
-            variant="ghost"
-            className="mb-4"
-            onClick={() => router.push(`/projects/${projectId}/workflows`)}
-          >
-            <ArrowLeft className="mr-2" />
-            Back to Workflows
-          </Button>
+          <Breadcrumb className="mb-4">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/">Home</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/dashboard">Dashboard</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={`/projects/${projectId}`}>Project</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href={`/projects/${projectId}/workflows`}>Workflows</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{workflow?.name ?? "Workflow"}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
           {/* Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">

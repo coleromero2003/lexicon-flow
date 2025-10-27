@@ -11,6 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   Dialog,
   DialogHeader,
   DialogContent,
@@ -32,7 +40,6 @@ import {
   Search,
   Share2,
   Workflow as WorkflowIcon,
-  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -131,19 +138,37 @@ export default function WorkflowsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8 space-y-4">
-          <Button
-            variant="ghost"
-            className="mb-0 w-fit"
-            onClick={() => router.push("/projects")}
-          >
-            <ArrowLeft className="mr-2" />
-            Back to Projects
-          </Button>
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={`/projects/${projectId}`}>{projectName}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Workflows</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                Workflows for {projectName} 🔄
+                Workflows for {projectName}
               </h1>
               <p className="text-gray-600">
                 Manage your workflows and their steps.
