@@ -12,7 +12,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,7 +61,10 @@ const createDefaultFilters = (): Filters => ({
 });
 
 const sanitizePlainText = (value: string) =>
-  value.replace(/<[^>]*>/g, "").replace(/[\r\n\t]+/g, " ").trim();
+  value
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
 
 const sanitizeProjectCode = (value: string) => sanitizePlainText(value);
 
@@ -67,7 +75,7 @@ function DashboardErrorFallback() {
       <main className="container mx-auto px-4 py-12">
         <EmptyState
           title="Something went wrong"
-          description="We couldn&apos;t render your projects. Please refresh and try again."
+          description="We couldn't render your projects. Please refresh and try again."
           action={
             <Button onClick={() => window.location.reload()}>
               Reload page
@@ -155,7 +163,9 @@ function ProjectsPageContent() {
     }
 
     if (name.length > MAX_NAME_LENGTH) {
-      setFormError(`Project name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+      setFormError(
+        `Project name must be ${MAX_NAME_LENGTH} characters or fewer.`
+      );
       return;
     }
 
@@ -294,7 +304,9 @@ function ProjectsPageContent() {
                     Active Filters
                   </p>
                   <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                    {filters.search || filters.dateRange.start || filters.dateRange.end
+                    {filters.search ||
+                    filters.dateRange.start ||
+                    filters.dateRange.end
                       ? 1
                       : 0}
                   </p>
@@ -373,7 +385,11 @@ function ProjectsPageContent() {
             >
               <List className="mr-2 h-4 w-4" /> List view
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsFilterOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFilterOpen(true)}
+            >
               <Filter className="mr-2 h-4 w-4" /> Filters
             </Button>
             <Button size="sm" onClick={() => setIsCreatingProject(true)}>
@@ -536,7 +552,9 @@ function ProjectsPageContent() {
               <Button variant="outline" onClick={handleClearFilters}>
                 Clear Filters
               </Button>
-              <Button onClick={() => setIsFilterOpen(false)}>Apply Filters</Button>
+              <Button onClick={() => setIsFilterOpen(false)}>
+                Apply Filters
+              </Button>
             </div>
           </div>
         </DialogContent>
