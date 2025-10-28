@@ -14,6 +14,21 @@ import {
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
+function isScadaObject(value: unknown): value is ScadaObject {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ScadaObject>;
+
+  return (
+    typeof candidate.id === "number" &&
+    typeof candidate.project_id === "number" &&
+    typeof candidate.sort_order === "number" &&
+    typeof candidate.priority === "string"
+  );
+}
+
 // =======================
 // PROJECT SERVICES
 // =======================
@@ -248,11 +263,19 @@ export const objectService = {
 
     if (error) throw error;
 
-    const typedData = data as { objects: ScadaObject | null }[] | null;
+    const entries = Array.isArray(data) ? data : [];
+
     const objects =
-      typedData
-        ?.map((entry) => entry.objects)
-        .filter((object): object is ScadaObject => Boolean(object)) ?? [];
+      entries
+        .map((entry) => {
+          if (!entry || typeof entry !== "object" || !("objects" in entry)) {
+            return null;
+          }
+
+          const candidate = (entry as { objects: unknown }).objects;
+          return isScadaObject(candidate) ? candidate : null;
+        })
+        .filter((object): object is ScadaObject => object !== null);
 
     return objects;
   },
