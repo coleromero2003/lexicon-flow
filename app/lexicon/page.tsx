@@ -92,19 +92,21 @@ export default function LexiconPage() {
   }, [isSignedIn, userLoaded, router]);
 
   useEffect(() => {
-    if (!supabase || !organization) {
+    if (!supabase || !organization?.id) {
       return;
     }
 
     let isMounted = true;
 
-    async function loadLexicon(client: SupabaseClient) {
+    const orgId = organization.id;
+
+    async function loadLexicon(client: SupabaseClient, organizationId: string) {
       try {
         setLoading(true);
         setError(null);
         const items = await lexiconService.getLexiconItemsForOrg(
           client,
-          organization.id
+          organizationId
         );
         if (!isMounted) return;
         setLexiconItems(items);
@@ -118,7 +120,7 @@ export default function LexiconPage() {
       }
     }
 
-    loadLexicon(supabase);
+    loadLexicon(supabase, orgId);
 
     return () => {
       isMounted = false;
