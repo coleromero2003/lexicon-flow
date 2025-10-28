@@ -65,6 +65,8 @@ export default function LexiconItemPage() {
       return;
     }
 
+    const supabaseClient = supabase;
+
     let isMounted = true;
 
     async function loadLexiconItem() {
@@ -73,8 +75,8 @@ export default function LexiconItemPage() {
         setError(null);
 
         const [lexiconItem, objects] = await Promise.all([
-          lexiconService.getLexiconItem(supabase, lexiconId),
-          objectService.getObjectsByLexicon(supabase, lexiconId),
+          lexiconService.getLexiconItem(supabaseClient, lexiconId),
+          objectService.getObjectsByLexicon(supabaseClient, lexiconId),
         ]);
 
         if (!isMounted) return;
