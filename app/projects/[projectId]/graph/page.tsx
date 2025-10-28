@@ -499,6 +499,10 @@ function ProjectGraphPageContent() {
           }
 
           const nodeData = graph.getNodeAttributes(nodeKey);
+          const nodeLabel =
+            nodeData && typeof nodeData.label === "string"
+              ? nodeData.label
+              : nodeKey;
 
           if (nodeType === "file" && graphData) {
             const fileData = graphData.files.find((file) => file.id === id);
@@ -511,7 +515,7 @@ function ProjectGraphPageContent() {
           setSelectedNode({
             type: nodeType as "object" | "file" | "lexicon",
             id,
-            label: nodeData.label || nodeKey,
+            label: nodeLabel,
           });
           setDialogOpen(true);
         };
