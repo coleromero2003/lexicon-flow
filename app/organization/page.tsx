@@ -1,8 +1,13 @@
 "use client";
 
-import { OrganizationProfile, CreateOrganization, useOrganization, useUser } from "@clerk/nextjs";
+import {
+  OrganizationProfile,
+  CreateOrganization,
+  useOrganization,
+  useUser,
+} from "@clerk/nextjs";
 import Navbar from "@/components/navbar";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -12,7 +17,11 @@ import { useRouter } from "next/navigation";
 export default function OrganizationPage() {
   const router = useRouter();
   const { isSignedIn, isLoaded: userLoaded } = useUser();
-  const { organization } = useOrganization();
+  const {
+    organization,
+    membership,
+    isLoaded: organizationLoaded,
+  } = useOrganization();
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -22,7 +31,9 @@ export default function OrganizationPage() {
   }, [isSignedIn, userLoaded, router]);
 
   // Show loading while checking authentication
-  if (!userLoaded) {
+  const shouldShowLoading = !userLoaded || (isSignedIn && !organizationLoaded);
+
+  if (shouldShowLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <LoadingSpinner label="Loading your account..." />
@@ -33,6 +44,34 @@ export default function OrganizationPage() {
   // Don't render anything if not signed in (will redirect)
   if (!isSignedIn) {
     return null;
+  }
+
+  const isAdmin = membership?.role === "org:admin";
+
+  if (organization && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+
+        <main className="container mx-auto px-4 py-6 sm:py-8">
+          <div className="max-w-xl mx-auto text-center">
+            <div className="bg-white shadow-lg rounded-lg p-8">
+              <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
+              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                Administrator Access Required
+              </h1>
+              <p className="text-gray-600 mb-6">
+                Only organization administrators can manage organization settings.
+                Please contact an administrator to request access.
+              </p>
+              <Link href="/projects">
+                <Button>Go to Projects</Button>
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
