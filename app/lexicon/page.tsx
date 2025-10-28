@@ -10,6 +10,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { BookOpen } from "lucide-react";
 import Link from "next/link";
@@ -32,10 +33,7 @@ export default function LexiconPage() {
   if (!userLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner label="Loading your account..." />
       </div>
     );
   }
