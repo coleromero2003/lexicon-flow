@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
-import Graph from "graphology";
-import type Sigma from "sigma";
 import Link from "next/link";
-import {
-  Loader2,
-  RefreshCcw,
-} from "lucide-react";
+import { RefreshCcw } from "lucide-react";
 
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -39,6 +34,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
@@ -98,6 +95,48 @@ const EDGE_LEGEND = [
   { label: "Lexicon ↔ File", color: EDGE_COLORS.lexiconFile },
 ] as const;
 
+const OBJECT_CIRCLE_RADIUS = 6; // Inner circle for SCADA objects
+const FILE_CIRCLE_RADIUS = 10; // Middle circle for project files
+const LEXICON_CIRCLE_RADIUS = 14; // Outer circle for lexicon items
+
+type GraphAttributes = Record<string, unknown>;
+
+type GraphInstance = {
+  addNode: (key: string, attributes?: GraphAttributes) => void;
+  addDirectedEdgeWithKey: (
+    key: string,
+    source: string,
+    target: string,
+    attributes?: GraphAttributes
+  ) => void;
+  addUndirectedEdgeWithKey: (
+    key: string,
+    source: string,
+    target: string,
+    attributes?: GraphAttributes
+  ) => void;
+  hasNode: (key: string) => boolean;
+  hasEdge: (key: string) => boolean;
+  getNodeAttributes: (key: string) => GraphAttributes;
+};
+
+type GraphConstructor = new () => GraphInstance;
+
+type SigmaNodeEvent = { node: string };
+
+type SigmaInstance = {
+  on: (event: string, handler: (payload: SigmaNodeEvent) => void) => void;
+  off: (event: string, handler: (payload: SigmaNodeEvent) => void) => void;
+  refresh: () => void;
+  kill: () => void;
+};
+
+type SigmaConstructor = new (
+  graph: GraphInstance,
+  container: HTMLElement,
+  settings?: Record<string, unknown>
+) => SigmaInstance;
+
 function getPolarPosition(index: number, total: number, radius: number) {
   if (total <= 1) {
     return { x: radius, y: 0 };
@@ -110,12 +149,16 @@ function getPolarPosition(index: number, total: number, radius: number) {
   };
 }
 
-function buildGraph(data: GraphData) {
-  const graph = new Graph();
+function buildGraph(GraphLibrary: GraphConstructor, data: GraphData): GraphInstance {
+  const graph = new GraphLibrary();
 
   const objectCount = data.objects.length;
   data.objects.forEach((object, index) => {
-    const { x, y } = getPolarPosition(index, Math.max(objectCount, 1), 6);
+    const { x, y } = getPolarPosition(
+      index,
+      Math.max(objectCount, 1),
+      OBJECT_CIRCLE_RADIUS
+    );
     graph.addNode(`object-${object.id}`, {
       label: object.title,
       x,
@@ -128,7 +171,11 @@ function buildGraph(data: GraphData) {
 
   const fileCount = data.files.length;
   data.files.forEach((file, index) => {
-    const { x, y } = getPolarPosition(index, Math.max(fileCount, 1), 10);
+    const { x, y } = getPolarPosition(
+      index,
+      Math.max(fileCount, 1),
+      FILE_CIRCLE_RADIUS
+    );
     graph.addNode(`file-${file.id}`, {
       label: file.filename,
       x,
@@ -141,7 +188,11 @@ function buildGraph(data: GraphData) {
 
   const lexiconCount = data.lexiconItems.length;
   data.lexiconItems.forEach((item, index) => {
-    const { x, y } = getPolarPosition(index, Math.max(lexiconCount, 1), 14);
+    const { x, y } = getPolarPosition(
+      index,
+      Math.max(lexiconCount, 1),
+      LEXICON_CIRCLE_RADIUS
+    );
     graph.addNode(`lexicon-${item.id}`, {
       label: item.name,
       x,
@@ -213,11 +264,30 @@ function buildGraph(data: GraphData) {
   return graph;
 }
 
-export default function ProjectGraphPage() {
+function GraphErrorFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="container mx-auto px-4 py-12">
+        <EmptyState
+          title="Something went wrong"
+          description="We couldn&apos;t render the project graph. Please refresh and try again."
+          action={
+            <Button onClick={() => window.location.reload()}>
+              Reload page
+            </Button>
+          }
+        />
+      </main>
+    </div>
+  );
+}
+
+function ProjectGraphPageContent() {
   const { projectId } = useParams<{ projectId: string }>();
   const projectIdNum = Number(projectId);
   const router = useRouter();
-  const { organization } = useOrganization();
+  const { organization, isLoaded: organizationLoaded } = useOrganization();
   const { supabase } = useSupabase();
 
   const [projectName, setProjectName] = useState<string>("");
@@ -232,7 +302,7 @@ export default function ProjectGraphPage() {
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const sigmaInstanceRef = useRef<Sigma | null>(null);
+  const sigmaInstanceRef = useRef<SigmaInstance | null>(null);
 
   const {
     openFile,
@@ -241,14 +311,20 @@ export default function ProjectGraphPage() {
   } = useSupabaseFileViewer({
     supabase,
     bucket: "lexicon-files",
-    onError: (error) => {
-      console.error("Failed to open file", error);
+    onError: (viewerError) => {
+      console.error("Failed to open file", viewerError);
     },
   });
 
   const fetchGraphData = useCallback(
     async (cancelRef?: { current: boolean }) => {
-      if (!supabase || Number.isNaN(projectIdNum)) {
+      if (!supabase || Number.isNaN(projectIdNum) || !organizationLoaded) {
+        return;
+      }
+
+      if (!organization) {
+        setGraphData(null);
+        setLoading(false);
         return;
       }
 
@@ -281,60 +357,59 @@ export default function ProjectGraphPage() {
             lexiconItems: [],
             lexiconFileLinks: [],
           });
-          return;
-        }
+        } else {
+          const objectIds = objects.map((obj) => obj.id);
 
-        const objectIds = objects.map((obj) => obj.id);
-
-        const [relations, objectFileLinks, objectLexiconLinks] =
-          await Promise.all([
-            objectRelationService.getRelationsForObjects(
-              supabase,
-              objectIds
-            ),
-            objectFileService.getLinksForObjects(supabase, objectIds),
-            objectLexiconService.getLinksForObjects(supabase, objectIds),
-          ]);
-        if (cancelRef?.current) return;
-
-        const lexiconIds = Array.from(
-          new Set(objectLexiconLinks.map((link) => link.lexicon_id))
-        );
-
-        const [lexiconItems, lexiconFileLinks] =
-          lexiconIds.length > 0
-            ? await Promise.all([
-                lexiconService.getLexiconItemsByIds(supabase, lexiconIds),
-                lexiconFileService.getLinksForLexiconIds(
-                  supabase,
-                  lexiconIds
-                ),
-              ])
-            : [[], []];
-        if (cancelRef?.current) return;
-
-        const fileIds = new Set<number>();
-        objectFileLinks.forEach((link) => fileIds.add(link.file_id));
-        lexiconFileLinks.forEach((link) => fileIds.add(link.file_id));
-
-        const files =
-          fileIds.size > 0
-            ? await fileService.getFilesByIds(
+          const [relations, objectFileLinks, objectLexiconLinks] =
+            await Promise.all([
+              objectRelationService.getRelationsForObjects(
                 supabase,
-                Array.from(fileIds)
-              )
-            : [];
-        if (cancelRef?.current) return;
+                objectIds
+              ),
+              objectFileService.getLinksForObjects(supabase, objectIds),
+              objectLexiconService.getLinksForObjects(supabase, objectIds),
+            ]);
+          if (cancelRef?.current) return;
 
-        setGraphData({
-          objects,
-          relations,
-          objectFileLinks,
-          objectLexiconLinks,
-          files,
-          lexiconItems,
-          lexiconFileLinks,
-        });
+          const lexiconIds = Array.from(
+            new Set(objectLexiconLinks.map((link) => link.lexicon_id))
+          );
+
+          let lexiconItems: LexiconItem[] = [];
+          let lexiconFileLinks: LexiconFileLink[] = [];
+
+          if (lexiconIds.length > 0) {
+            const lexiconResults = await Promise.all([
+              lexiconService.getLexiconItemsByIds(supabase, lexiconIds),
+              lexiconFileService.getLinksForLexiconIds(supabase, lexiconIds),
+            ]);
+            if (cancelRef?.current) return;
+            [lexiconItems, lexiconFileLinks] = lexiconResults;
+          }
+
+          const fileIds = new Set<number>();
+          objectFileLinks.forEach((link) => fileIds.add(link.file_id));
+          lexiconFileLinks.forEach((link) => fileIds.add(link.file_id));
+
+          let files: FileMeta[] = [];
+          if (fileIds.size > 0) {
+            files = await fileService.getFilesByIds(
+              supabase,
+              Array.from(fileIds)
+            );
+            if (cancelRef?.current) return;
+          }
+
+          setGraphData({
+            objects,
+            relations,
+            objectFileLinks,
+            objectLexiconLinks,
+            files,
+            lexiconItems,
+            lexiconFileLinks,
+          });
+        }
       } catch (err) {
         if (cancelRef?.current) return;
         console.error("Failed to load project graph", err);
@@ -350,12 +425,17 @@ export default function ProjectGraphPage() {
         }
       }
     },
-    [supabase, projectIdNum]
+    [
+      supabase,
+      projectIdNum,
+      organization,
+      organizationLoaded,
+    ]
   );
 
   useEffect(() => {
     const cancelRef = { current: false };
-    fetchGraphData(cancelRef);
+    void fetchGraphData(cancelRef);
     return () => {
       cancelRef.current = true;
     };
@@ -379,72 +459,85 @@ export default function ProjectGraphPage() {
       return;
     }
 
-    let renderer: InstanceType<typeof Sigma> | null = null;
+    let active = true;
+    let cleanup: (() => void) | undefined;
 
-    // Dynamically import Sigma only on the client side
     const initSigma = async () => {
-      const { default: SigmaConstructor } = await import("sigma");
+      try {
+        const [{ default: GraphLibrary }, { default: SigmaLibrary }] =
+          await Promise.all([
+            import("graphology"),
+            import("sigma"),
+          ]);
 
-      if (!containerRef.current) return;
+        if (!containerRef.current || !active) {
+          return;
+        }
 
-      const graph = buildGraph(graphData);
-      renderer = new SigmaConstructor(graph, containerRef.current, {
-        renderLabels: true,
-        labelDensity: 1,
-      });
-      sigmaInstanceRef.current = renderer;
+        const graph = buildGraph(
+          GraphLibrary as unknown as GraphConstructor,
+          graphData
+        );
 
-      const handleNodeClick = async (event: { node: string }) => {
-        const nodeKey = event.node;
-        const [nodeType, nodeId] = nodeKey.split("-");
-        const id = Number(nodeId);
+        const renderer = new (SigmaLibrary as unknown as SigmaConstructor)(
+          graph,
+          containerRef.current,
+          {
+            renderLabels: true,
+            labelDensity: 1,
+          }
+        );
+        sigmaInstanceRef.current = renderer;
 
-        if (!Number.isNaN(id)) {
+        const handleNodeClick = async (event: SigmaNodeEvent) => {
+          const nodeKey = event.node;
+          const [nodeType, nodeId] = nodeKey.split("-");
+          const id = Number(nodeId);
+
+          if (Number.isNaN(id)) {
+            return;
+          }
+
           const nodeData = graph.getNodeAttributes(nodeKey);
 
-          // If it's a file, open the file viewer
           if (nodeType === "file" && graphData) {
-            const fileData = graphData.files.find((f) => f.id === id);
+            const fileData = graphData.files.find((file) => file.id === id);
             if (fileData) {
               await openFile(fileData);
               return;
             }
           }
 
-          // For non-file nodes, show the navigation dialog
           setSelectedNode({
             type: nodeType as "object" | "file" | "lexicon",
             id,
             label: nodeData.label || nodeKey,
           });
           setDialogOpen(true);
-        }
-      };
+        };
 
-      renderer.on("clickNode", handleNodeClick);
+        renderer.on("clickNode", handleNodeClick);
 
-      const handleResize = () => {
-        renderer?.refresh();
-      };
+        const handleResize = () => {
+          renderer.refresh();
+        };
 
-      window.addEventListener("resize", handleResize);
+        window.addEventListener("resize", handleResize);
 
-      return () => {
-        window.removeEventListener("resize", handleResize);
-        if (renderer) {
+        cleanup = () => {
+          window.removeEventListener("resize", handleResize);
           renderer.off("clickNode", handleNodeClick);
           renderer.kill();
-        }
-      };
+        };
+      } catch (err) {
+        console.error("Failed to initialize Sigma", err);
+      }
     };
 
-    let cleanup: (() => void) | undefined;
-
-    initSigma().then((cleanupFn) => {
-      cleanup = cleanupFn;
-    });
+    void initSigma();
 
     return () => {
+      active = false;
       cleanup?.();
       sigmaInstanceRef.current = null;
     };
@@ -483,36 +576,43 @@ export default function ProjectGraphPage() {
   const handleNavigateToNode = () => {
     if (!selectedNode) return;
 
-    let url = "";
-    switch (selectedNode.type) {
-      case "object":
-        // Navigate to object detail page (you may need to adjust this URL)
-        url = `/projects/${projectId}/objects/${selectedNode.id}`;
-        break;
-      case "file":
-        // Navigate to file detail page (you may need to adjust this URL)
-        url = `/projects/${projectId}/files/${selectedNode.id}`;
-        break;
-      case "lexicon":
-        // Navigate to lexicon item detail page (you may need to adjust this URL)
-        url = `/lexicon/${selectedNode.id}`;
-        break;
+    const { type, id } = selectedNode;
+
+    if (type === "object") {
+      router.push(`/projects/${projectId}/objects/${id}`);
+    } else if (type === "file") {
+      router.push(`/projects/${projectId}/files/${id}`);
+    } else {
+      router.push(`/lexicon/${id}`);
     }
 
-    if (url) {
-      router.push(url);
-    }
     setDialogOpen(false);
   };
+
+  if (!organizationLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="container mx-auto px-4 py-12">
+          <LoadingSpinner label="Loading organization..." />
+        </main>
+      </div>
+    );
+  }
 
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <main className="container mx-auto px-4 py-12">
+        <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="No organization selected"
-            description="Please select an organization to view project data."
+            description="Please select or create an organization to view project graphs."
+            action={
+              <Button onClick={() => router.push("/dashboard")}>
+                Go to dashboard
+              </Button>
+            }
           />
         </main>
       </div>
@@ -528,7 +628,9 @@ export default function ProjectGraphPage() {
             title="Invalid project"
             description="The requested project could not be determined."
             action={
-              <Button onClick={() => router.push("/projects")}>Go back</Button>
+              <Button onClick={() => router.push("/projects")}>
+                Go back
+              </Button>
             }
           />
         </main>
@@ -569,19 +671,18 @@ export default function ProjectGraphPage() {
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
                 System graph {projectName ? `for ${projectName}` : ""}
               </h1>
-              <p className="text-gray-600 mt-1">
-                Visualize how objects, files, and lexicon items connect within
-                your project.
+              <p className="mt-1 text-gray-600">
+                Visualize how objects, files, and lexicon items connect within your project.
               </p>
             </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchGraphData()}
+                onClick={() => void fetchGraphData()}
                 disabled={loading}
               >
                 <RefreshCcw
@@ -612,9 +713,7 @@ export default function ProjectGraphPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">
-                Lexicon items
-              </CardTitle>
+              <CardTitle className="text-sm text-gray-500">Lexicon items</CardTitle>
               <CardDescription className="text-2xl font-semibold text-gray-900">
                 {graphData?.lexiconItems.length ?? 0}
               </CardDescription>
@@ -634,13 +733,12 @@ export default function ProjectGraphPage() {
           <CardHeader>
             <CardTitle>Graph legend</CardTitle>
             <CardDescription>
-              Colors indicate the node or relationship type inside the graph
-              visualization.
+              Colors indicate the node or relationship type inside the graph visualization.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Nodes</p>
+              <p className="mb-2 text-sm font-medium text-gray-700">Nodes</p>
               <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                 {NODE_LEGEND.map((item) => (
                   <div key={item.label} className="flex items-center gap-2">
@@ -654,7 +752,7 @@ export default function ProjectGraphPage() {
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="mb-2 text-sm font-medium text-gray-700">
                 Relationships
               </p>
               <div className="flex flex-wrap gap-4 text-sm text-gray-600">
@@ -687,15 +785,17 @@ export default function ProjectGraphPage() {
                 title="Unable to load graph"
                 description={error}
                 action={
-                  <Button onClick={() => fetchGraphData()}>
+                  <Button onClick={() => void fetchGraphData()}>
                     Retry loading graph
                   </Button>
                 }
               />
             ) : loading ? (
               <div className="flex h-[360px] flex-col items-center justify-center text-gray-500">
-                <Loader2 className="mb-3 h-6 w-6 animate-spin" />
-                <p>Loading graph data...</p>
+                <LoadingSpinner
+                  label="Loading graph data..."
+                  iconClassName="h-6 w-6"
+                />
               </div>
             ) : hasGraphNodes ? (
               <div ref={containerRef} className="h-[520px] w-full" />
@@ -712,9 +812,12 @@ export default function ProjectGraphPage() {
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Navigate to {selectedNode?.label}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Navigate to {selectedNode?.label}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to go to the detail page for this{" "}
+              Would you like to go to the detail page for this
+              {" "}
               {selectedNode?.type === "object"
                 ? "object"
                 : selectedNode?.type === "file"
@@ -740,5 +843,13 @@ export default function ProjectGraphPage() {
         loading={viewerLoading}
       />
     </div>
+  );
+}
+
+export default function ProjectGraphPage() {
+  return (
+    <PageErrorBoundary fallback={<GraphErrorFallback />}>
+      <ProjectGraphPageContent />
+    </PageErrorBoundary>
   );
 }
