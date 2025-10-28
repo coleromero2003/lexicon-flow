@@ -11,6 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   Dialog,
   DialogHeader,
   DialogContent,
@@ -30,16 +38,15 @@ import {
   List,
   Plus,
   Search,
+  Share2,
   Workflow as WorkflowIcon,
-  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
 export default function WorkflowsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const router = useRouter();
   const projectIdNum = parseInt(projectId, 10);
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
@@ -130,21 +137,51 @@ export default function WorkflowsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={`/projects/${projectId}`}>{projectName}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Workflows</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="mb-6 sm:mb-8">
-          <Button
-            variant="ghost"
-            className="mb-4"
-            onClick={() => router.push("/projects")}
-          >
-            <ArrowLeft className="mr-2" />
-            Back to Projects
-          </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Workflows for {projectName} 🔄
-          </h1>
-          <p className="text-gray-600">
-            Manage your workflows and their steps.
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                Workflows for {projectName}
+              </h1>
+              <p className="text-gray-600">
+                Manage your workflows and their steps.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link href={`/projects/${projectId}/graph`}>
+                <Button variant="outline" size="sm" className="flex items-center gap-2">
+                  <Share2 className="h-4 w-4" />
+                  System graph
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Stats */}

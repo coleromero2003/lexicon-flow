@@ -3,12 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import Navbar from "@/components/navbar";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,7 +43,7 @@ import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { objectService } from "@/lib/services";
+import { objectService, projectService } from "@/lib/services";
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -47,6 +56,25 @@ export default function ObjectPage() {
   const parsedProjectId = Number(projectId);
 
   const { supabase } = useSupabase();
+  const [projectName, setProjectName] = useState<string>("");
+
+  // Load project name for breadcrumbs
+  useEffect(() => {
+    async function loadProject() {
+      if (parsedProjectId && supabase) {
+        try {
+          const project = await projectService.getProjectById(
+            supabase,
+            parsedProjectId
+          );
+          setProjectName(project.name);
+        } catch (err) {
+          console.error("Failed to load project:", err);
+        }
+      }
+    }
+    loadProject();
+  }, [parsedProjectId, supabase]);
 
   const { object, loading, error, updateObject } = useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
@@ -362,8 +390,7 @@ export default function ObjectPage() {
               "The object you're looking for doesn't exist or has been deleted."
             }
             action={
-              <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
+              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/objects`)}>
                 Go Back
               </Button>
             }
@@ -385,6 +412,38 @@ export default function ObjectPage() {
       />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
+        <Breadcrumb className="mb-4">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/">Home</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={`/projects/${projectId}`}>{projectName || "Project"}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href={`/projects/${projectId}/objects`}>Objects</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{object.title}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <ObjectHeader
           object={object}
           orgUsers={organizationUsers.map(({ userId, name }) => ({
@@ -392,7 +451,7 @@ export default function ObjectPage() {
             name,
           }))}
           onEdit={handleOpenEditSheet}
-          onBack={() => router.back()}
+          onBack={() => router.push(`/projects/${projectId}/objects`)}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
