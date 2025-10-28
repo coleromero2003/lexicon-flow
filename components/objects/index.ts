@@ -7,5 +7,6 @@ export { FilesCard } from "./files-card";
 export { PropertiesCard } from "./properties-card";
 export { ConnectionsCard } from "./connections-card";
 export { LexiconCard } from "./lexicon-card";
-export { PRIORITIES, getPriorityColor } from "./constants";
+export { LinkObjectDialog } from "./link-object-dialog";
+export { PRIORITIES, RELATION_KIND_OPTIONS, getPriorityColor } from "./constants";
 export type { PriorityValue } from "./constants";
