@@ -457,7 +457,7 @@ export default function ObjectPage() {
             title="Object not found"
             description={
               error ||
-              "The object you're looking for doesn't exist or has been deleted."
+              "The object you&rsquo;re looking for doesn&rsquo;t exist or has been deleted."
             }
             action={
               <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/objects`)}>

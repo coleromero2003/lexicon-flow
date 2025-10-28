@@ -14,6 +14,21 @@ import {
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
+function isScadaObject(value: unknown): value is ScadaObject {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ScadaObject>;
+
+  return (
+    typeof candidate.id === "number" &&
+    typeof candidate.project_id === "number" &&
+    typeof candidate.sort_order === "number" &&
+    typeof candidate.priority === "string"
+  );
+}
+
 // =======================
 // PROJECT SERVICES
 // =======================
@@ -235,6 +250,34 @@ export const objectService = {
       .contains("workflow_id", [workflowId]);
     if (error) throw error;
     return data || [];
+  },
+
+  async getObjectsByLexicon(
+    supabase: SupabaseClient,
+    lexiconId: number
+  ): Promise<ScadaObject[]> {
+    const { data, error } = await supabase
+      .from("object_lexicon_links")
+      .select("objects(*)")
+      .eq("lexicon_id", lexiconId);
+
+    if (error) throw error;
+
+    const entries = Array.isArray(data) ? data : [];
+
+    const objects =
+      entries
+        .map((entry) => {
+          if (!entry || typeof entry !== "object" || !("objects" in entry)) {
+            return null;
+          }
+
+          const candidate = (entry as { objects: unknown }).objects;
+          return isScadaObject(candidate) ? candidate : null;
+        })
+        .filter((object): object is ScadaObject => object !== null);
+
+    return objects;
   },
 
   async createObject(
@@ -613,6 +656,20 @@ export const lexiconService = {
       .eq("org_id", orgId)
       .eq("type", type)
       .order("name", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getLexiconItemsForOrg(
+    supabase: SupabaseClient,
+    orgId: string
+  ): Promise<LexiconItem[]> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .select("*")
+      .eq("org_id", orgId)
+      .order("name", { ascending: true });
+
     if (error) throw error;
     return data || [];
   },
