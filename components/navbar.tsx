@@ -24,7 +24,7 @@ export default function Navbar({
   const { isSignedIn, user } = useUser();
   const pathname = usePathname();
 
-  const isProjectsPage = pathname === "/projects" || pathname === "/dashboard";
+  const isProjectsPage = pathname === "/dashboard";
   const isBoardPage = pathname.startsWith("/boards/");
   const isWorkflowsPage =
     pathname === "/workflows" || pathname.startsWith("/workflows/");
@@ -80,7 +80,7 @@ export default function Navbar({
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-              <Link href="/projects">
+              <Link href="/dashboard">
                 <Button variant="ghost" size="sm" className="hidden sm:flex">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Dashboard
@@ -122,7 +122,7 @@ export default function Navbar({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
               <Link
-                href="/projects"
+                href="/dashboard"
                 className="flex items-center space-x-1 sm:space-x-2 text-gray-600 hover:text-gray-900 flex-shrink-0"
               >
                 <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -198,7 +198,7 @@ export default function Navbar({
               <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">
                 Welcome, {user.firstName ?? user.emailAddresses[0].emailAddress}
               </span>
-              <Link href="/projects">
+              <Link href="/dashboard">
                 <Button size="sm" className="text-xs sm:text-sm">
                   Go to Dashboard <ArrowRight />
                 </Button>
