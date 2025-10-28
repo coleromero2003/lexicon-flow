@@ -42,12 +42,11 @@ import {
   Workflow as WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
 export default function WorkflowsPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const router = useRouter();
   const projectIdNum = parseInt(projectId, 10);
   const { organization } = useOrganization();
   const { supabase } = useSupabase();

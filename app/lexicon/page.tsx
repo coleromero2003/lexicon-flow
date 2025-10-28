@@ -1,7 +1,6 @@
 "use client";
 
 import Navbar from "@/components/navbar";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Breadcrumb,
@@ -105,7 +104,7 @@ export default function LexiconPage() {
             </div>
             <CardTitle className="text-xl">Lexicon Management</CardTitle>
             <CardDescription>
-              This page will allow you to manage your organization's lexicon items including parts, workflow templates, step templates, documents, specs, and clients.
+              This page will allow you to manage your organization&apos;s lexicon items including parts, workflow templates, step templates, documents, specs, and clients.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">

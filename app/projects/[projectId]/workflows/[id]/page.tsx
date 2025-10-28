@@ -324,7 +324,6 @@ function ObjectOverlay({ object }: { object: ScadaObject }) {
 
 export default function WorkflowPage() {
   const { id, projectId } = useParams<{ id: string; projectId: string }>();
-  const router = useRouter();
   const workflowId = parseInt(id, 10);
   const {
     workflow,

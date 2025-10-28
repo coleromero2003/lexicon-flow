@@ -390,8 +390,7 @@ export default function ObjectPage() {
               "The object you're looking for doesn't exist or has been deleted."
             }
             action={
-              <Button variant="outline" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
+              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/objects`)}>
                 Go Back
               </Button>
             }
