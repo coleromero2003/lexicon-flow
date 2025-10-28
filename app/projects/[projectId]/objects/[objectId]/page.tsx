@@ -26,13 +26,15 @@ import {
   EditObjectSheet,
   FilesCard,
   LexiconCard,
+  LinkObjectDialog,
   ObjectHeader,
   PropertiesCard,
   SubtasksCard,
   WorkflowsCard,
   PRIORITIES,
-  PriorityValue,
+  RELATION_KIND_OPTIONS,
 } from "@/components/objects";
+import type { PriorityValue } from "@/components/objects";
 import { useObject } from "@/lib/hooks/useObjects";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { useSubtasks } from "@/lib/hooks/useSubtasks";
@@ -44,6 +46,7 @@ import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
+import type { RelationKind, ScadaObject } from "@/lib/supabase/models";
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -109,12 +112,56 @@ export default function ObjectPage() {
     }
   );
 
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [projectObjects, setProjectObjects] = useState<ScadaObject[]>([]);
+  const [isLoadingProjectObjects, setIsLoadingProjectObjects] = useState(false);
+  const [isLinkingObject, setIsLinkingObject] = useState(false);
+
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadProjectObjects = useCallback(async () => {
+    if (!parsedProjectId || !supabase) return;
+
+    try {
+      setIsLoadingProjectObjects(true);
+      const objects = await objectService.getObjectsByProject(
+        supabase,
+        parsedProjectId
+      );
+      setProjectObjects(objects);
+    } catch (err) {
+      console.error("Failed to load project objects", err);
+      toast.error("Failed to load project objects");
+    } finally {
+      setIsLoadingProjectObjects(false);
+    }
+  }, [parsedProjectId, supabase]);
+
+  useEffect(() => {
+    loadProjectObjects();
+  }, [loadProjectObjects]);
 
   const storageBucket = useMemo(
     () => "lexicon-files",
     []
+  );
+
+  const linkedObjectIds = useMemo(
+    () => relationsHook.relations.map((relation) => relation.relatedObject.id),
+    [relationsHook.relations]
+  );
+
+  const linkableObjects = useMemo(
+    () =>
+      projectObjects
+        .filter(
+          (projectObject) =>
+            projectObject.id !== parsedObjectId &&
+            !linkedObjectIds.includes(projectObject.id)
+        )
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    [linkedObjectIds, parsedObjectId, projectObjects]
   );
 
   const handleFileViewerError = useCallback((error: Error) => {
@@ -335,6 +382,29 @@ export default function ObjectPage() {
 
   const handleViewFile = openObjectFile;
 
+  const handleOpenLinkDialog = useCallback(() => {
+    void loadProjectObjects();
+    setIsLinkDialogOpen(true);
+  }, [loadProjectObjects]);
+
+  const handleLinkObjects = useCallback(
+    async (targetObjectId: number, relationKind: RelationKind) => {
+      try {
+        setIsLinkingObject(true);
+        await relationsHook.createRelation(targetObjectId, relationKind);
+        toast.success("Connection created");
+        setIsLinkDialogOpen(false);
+      } catch (err) {
+        console.error("Failed to create relation", err);
+        toast.error("Failed to create connection");
+        throw err;
+      } finally {
+        setIsLinkingObject(false);
+      }
+    },
+    [relationsHook]
+  );
+
   const handleDeleteRelation = async (relationId: number) => {
     try {
       await relationsHook.deleteRelation(relationId);
@@ -491,6 +561,7 @@ export default function ObjectPage() {
 
             <ConnectionsCard
               relations={relationsHook.relations}
+              onAdd={handleOpenLinkDialog}
               onDelete={handleDeleteRelation}
               onNavigate={(relatedObjectId) =>
                 router.push(`/projects/${projectId}/objects/${relatedObjectId}`)
@@ -515,6 +586,20 @@ export default function ObjectPage() {
           name,
         }))}
         onSave={handleSaveEdit}
+      />
+
+      <LinkObjectDialog
+        open={isLinkDialogOpen}
+        onOpenChange={setIsLinkDialogOpen}
+        objects={linkableObjects.map((objectItem) => ({
+          id: objectItem.id,
+          title: objectItem.title,
+          description: objectItem.description_md,
+        }))}
+        relationKinds={RELATION_KIND_OPTIONS}
+        onSubmit={handleLinkObjects}
+        isSubmitting={isLinkingObject}
+        isLoadingObjects={isLoadingProjectObjects}
       />
 
       <PdfViewerDialog
