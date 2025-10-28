@@ -237,6 +237,26 @@ export const objectService = {
     return data || [];
   },
 
+  async getObjectsByLexicon(
+    supabase: SupabaseClient,
+    lexiconId: number
+  ): Promise<ScadaObject[]> {
+    const { data, error } = await supabase
+      .from("object_lexicon_links")
+      .select("objects(*)")
+      .eq("lexicon_id", lexiconId);
+
+    if (error) throw error;
+
+    const typedData = data as { objects: ScadaObject | null }[] | null;
+    const objects =
+      typedData
+        ?.map((entry) => entry.objects)
+        .filter((object): object is ScadaObject => Boolean(object)) ?? [];
+
+    return objects;
+  },
+
   async createObject(
     supabase: SupabaseClient,
     obj: Omit<ScadaObject, "id" | "created_at" | "updated_at">
@@ -613,6 +633,20 @@ export const lexiconService = {
       .eq("org_id", orgId)
       .eq("type", type)
       .order("name", { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getLexiconItemsForOrg(
+    supabase: SupabaseClient,
+    orgId: string
+  ): Promise<LexiconItem[]> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .select("*")
+      .eq("org_id", orgId)
+      .order("name", { ascending: true });
+
     if (error) throw error;
     return data || [];
   },
