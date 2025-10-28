@@ -55,6 +55,7 @@ vi.mock("@/components/ui/command", () => {
       </div>
     ),
     CommandList: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+    CommandSeparator: () => <div role="separator" />, 
   };
 });
 

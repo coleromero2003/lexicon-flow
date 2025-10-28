@@ -23,18 +23,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, User, Check } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { PRIORITIES } from "./constants";
+import { OrganizationUserCombobox } from "@/components/people/organization-user-combobox";
 
 interface EditObjectSheetProps {
   open: boolean;
@@ -62,7 +55,6 @@ export function EditObjectSheet({
   onSave,
 }: EditObjectSheetProps) {
   const [editForm, setEditForm] = useState(initialValues);
-  const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
 
   const handleSave = async () => {
@@ -93,54 +85,19 @@ export function EditObjectSheet({
 
           <div className="space-y-2">
             <Label>Assignee</Label>
-            <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={assigneeOpen}
-                  className="w-full justify-between"
-                >
-                  {editForm.assignee
-                    ? orgUsers.find((u) => u.userId === editForm.assignee)
-                        ?.name || editForm.assignee
-                    : "Select assignee..."}
-                  <User className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search users..." />
-                  <CommandList>
-                    <CommandEmpty>No user found.</CommandEmpty>
-                    <CommandGroup>
-                      {orgUsers.map((user) => (
-                        <CommandItem
-                          key={user.userId}
-                          value={user.userId}
-                          onSelect={(currentValue) => {
-                            setEditForm({
-                              ...editForm,
-                              assignee: currentValue,
-                            });
-                            setAssigneeOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              editForm.assignee === user.userId
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }`}
-                          />
-                          {user.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <OrganizationUserCombobox
+              users={orgUsers}
+              value={editForm.assignee ? editForm.assignee : null}
+              onChange={(userId) =>
+                setEditForm({
+                  ...editForm,
+                  assignee: userId ?? "",
+                })
+              }
+              placeholder="Select assignee..."
+              searchPlaceholder="Search users..."
+              emptyText="No user found."
+            />
           </div>
 
           <div className="space-y-2">
