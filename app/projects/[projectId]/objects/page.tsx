@@ -252,9 +252,9 @@ export default function ObjectsPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600">Medium Priority</CardTitle>
               <CardDescription className="text-2xl font-semibold text-gray-900">
-                {filteredObjects.filter((o) => o.status === "complete").length}
+                {filteredObjects.filter((o) => o.priority === "medium").length}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -287,13 +287,8 @@ export default function ObjectsPage() {
                             {object.description_md}
                           </p>
                         )}
-                        <div className="mt-2 flex gap-2">
+                        <div className="mt-2">
                           <BadgeByPriority priority={object.priority} />
-                          {object.status && (
-                            <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                              {object.status}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
