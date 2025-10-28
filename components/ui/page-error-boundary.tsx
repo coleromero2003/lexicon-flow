@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { Component, ErrorInfo, ReactNode } from "react";
 
 interface PageErrorBoundaryProps {
@@ -23,6 +24,18 @@ export class PageErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    Sentry.withScope((scope) => {
+      scope.setTag("error_boundary", "PageErrorBoundary");
+      scope.setContext("react", {
+        componentStack: errorInfo.componentStack,
+      });
+      scope.setExtra("errorBoundaryProps", {
+        hasFallback: Boolean(this.props.fallback),
+      });
+      scope.setFingerprint(["page-error-boundary", error.name]);
+      Sentry.captureException(error);
+    });
+
     if (process.env.NODE_ENV !== "production") {
       console.error("PageErrorBoundary caught an error", error, errorInfo);
     }
