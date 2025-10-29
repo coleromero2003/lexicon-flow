@@ -5,6 +5,7 @@ import {
   View,
   StyleSheet,
 } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
 import { ScadaObject, LexiconItem, ObjectLexiconLink } from "@/lib/supabase/models";
 
 // Register fonts if needed (optional)
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
   },
 });
 
-interface PurchaseReportDocumentProps {
+export interface PurchaseReportDocumentProps extends DocumentProps {
   object: ScadaObject;
   lexiconItems: Array<{
     link: ObjectLexiconLink;
@@ -117,6 +118,7 @@ export function PurchaseReportDocument({
   lexiconItems,
   projectName,
   organizationName,
+  ...documentProps
 }: PurchaseReportDocumentProps) {
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -140,7 +142,7 @@ export function PurchaseReportDocument({
   };
 
   return (
-    <Document>
+    <Document {...documentProps}>
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
