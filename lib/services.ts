@@ -324,6 +324,43 @@ export const objectService = {
     if (error) throw error;
     return data;
   },
+
+  async linkObjectToWorkflow(
+    supabase: SupabaseClient,
+    objectId: number,
+    workflowId: number,
+    stepId: number
+  ): Promise<ScadaObject> {
+    // First, get the current object to access its workflow_id and step_id arrays
+    const currentObject = await this.getObject(supabase, objectId);
+
+    // Add the new workflow and step IDs to the arrays (if not already present)
+    const workflowIds = currentObject.workflow_id || [];
+    const stepIds = currentObject.step_id || [];
+
+    if (!workflowIds.includes(workflowId)) {
+      workflowIds.push(workflowId);
+      stepIds.push(stepId);
+    } else {
+      // If workflow already exists, update the corresponding step
+      const index = workflowIds.indexOf(workflowId);
+      stepIds[index] = stepId;
+    }
+
+    // Update the object with the new arrays
+    const { data, error } = await supabase
+      .from("objects")
+      .update({
+        workflow_id: workflowIds,
+        step_id: stepIds,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", objectId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };
 
 // =======================

@@ -289,6 +289,35 @@ export function useWorkflow(workflowId: number) {
     }
   }
 
+  async function linkExistingObject(objectId: number, stepId: number) {
+    try {
+      if (!workflow) throw new Error("Workflow not loaded");
+      if (!supabase) throw new Error("Supabase client not initialized");
+
+      const updatedObject = await objectService.linkObjectToWorkflow(
+        supabase,
+        objectId,
+        workflow.id,
+        stepId
+      );
+
+      setSteps((prev) =>
+        prev.map((step) =>
+          step.id === stepId
+            ? { ...step, objects: [...step.objects, updatedObject] }
+            : step
+        )
+      );
+
+      return updatedObject;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to link object to workflow."
+      );
+      throw err;
+    }
+  }
+
   return {
     workflow,
     steps,
@@ -296,6 +325,7 @@ export function useWorkflow(workflowId: number) {
     error,
     updateWorkflow,
     createRealObject,
+    linkExistingObject,
     setSteps,
     moveObject,
     createStep,

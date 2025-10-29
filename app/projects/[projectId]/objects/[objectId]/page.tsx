@@ -44,9 +44,11 @@ import { useObjectLexicon } from "@/lib/hooks/useObjectLexicon";
 import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
+import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
 import type { RelationKind, ScadaObject } from "@/lib/supabase/models";
+import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -93,6 +95,7 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
+  const { isGenerating, isMerging, generateAndDownloadReport, mergeAndDownloadPdfs } = usePdfGeneration();
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editSheetKey, setEditSheetKey] = useState(0);
@@ -523,6 +526,34 @@ export default function ObjectPage() {
           onEdit={handleOpenEditSheet}
           onBack={() => router.push(`/projects/${projectId}/objects`)}
         />
+
+        {/* PDF Generation Actions */}
+        <div className="flex gap-2 mb-4">
+          <Button
+            onClick={() => generateAndDownloadReport(parsedObjectId, object.title)}
+            disabled={isGenerating}
+            variant="outline"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {isGenerating ? "Generating..." : "Generate Purchase Report"}
+          </Button>
+
+          {objectFiles.filter(f => f.mime_type === "application/pdf").length > 1 && (
+            <Button
+              onClick={() => {
+                const pdfFileIds = objectFiles
+                  .filter(f => f.mime_type === "application/pdf")
+                  .map(f => f.id);
+                mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
+              }}
+              disabled={isMerging}
+              variant="outline"
+            >
+              <FilePlus2 className="h-4 w-4 mr-2" />
+              {isMerging ? "Merging..." : `Merge ${objectFiles.filter(f => f.mime_type === "application/pdf").length} PDFs`}
+            </Button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
           <div className="space-y-6">

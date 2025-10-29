@@ -31,9 +31,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWorkflow } from "@/lib/hooks/useWorkflows";
 import { StepWithObjects, ScadaObject } from "@/lib/supabase/models";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import { Calendar, MoreHorizontal, Plus, User } from "lucide-react";
+import { Calendar, MoreHorizontal, Plus, User, Link2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { objectService } from "@/lib/services";
+import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import Link from "next/link";
 import {
   DndContext,
@@ -59,11 +61,13 @@ function DroppableStep({
   children,
   onCreateObject,
   onEditStep,
+  onLinkObject,
 }: {
   step: StepWithObjects;
   children: React.ReactNode;
   onCreateObject: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   onEditStep: (step: StepWithObjects) => void;
+  onLinkObject: (stepId: number) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: step.id });
   return (
@@ -103,23 +107,24 @@ function DroppableStep({
         {/* step content */}
         <div className="p-2">
           {children}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full mt-3 text-gray-500 hover:text-gray-700"
-              >
-                <Plus />
-                Add Object
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Object</DialogTitle>
-                <p className="text-sm text-gray-600">Add an object to the workflow</p>
-              </DialogHeader>
+          <div className="flex gap-2 mt-3">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-gray-500 hover:text-gray-700"
+                >
+                  <Plus />
+                  Create New
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Object</DialogTitle>
+                  <p className="text-sm text-gray-600">Add an object to the workflow</p>
+                </DialogHeader>
 
-              <form className="space-y-4" onSubmit={onCreateObject}>
+                <form className="space-y-4" onSubmit={onCreateObject}>
                 <div className="space-y-2">
                   <Label>Title *</Label>
                   <Input
@@ -173,6 +178,15 @@ function DroppableStep({
               </form>
             </DialogContent>
           </Dialog>
+          <Button
+            variant="ghost"
+            className="flex-1 text-gray-500 hover:text-gray-700"
+            onClick={() => onLinkObject(step.id)}
+          >
+            <Link2 className="h-4 w-4" />
+            Link Existing
+          </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -331,10 +345,12 @@ export default function WorkflowPage() {
     updateWorkflow,
     steps,
     createRealObject,
+    linkExistingObject,
     setSteps,
     moveObject,
     updateStep,
   } = useWorkflow(workflowId);
+  const { supabase } = useSupabase();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -343,12 +359,17 @@ export default function WorkflowPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCreatingStep, setIsCreatingStep] = useState(false);
   const [isEditingStep, setIsEditingStep] = useState(false);
+  const [isLinkingObject, setIsLinkingObject] = useState(false);
 
   const [newStepTitle, setNewStepTitle] = useState("");
   const [editingStepTitle, setEditingStepTitle] = useState("");
   const [editingStep, setEditingStep] = useState<StepWithObjects | null>(
     null
   );
+
+  const [availableObjects, setAvailableObjects] = useState<ScadaObject[]>([]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string>("");
+  const [targetStepForLink, setTargetStepForLink] = useState<number | null>(null);
 
   const [filters, setFilters] = useState({
     priority: [] as string[],
@@ -365,6 +386,34 @@ export default function WorkflowPage() {
       },
     })
   );
+
+  // Load available objects when linking dialog opens
+  useEffect(() => {
+    if (isLinkingObject && supabase && workflow) {
+      loadAvailableObjects();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLinkingObject, supabase, workflow]);
+
+  async function loadAvailableObjects() {
+    if (!supabase || !workflow) return;
+    try {
+      const allObjects = await objectService.getObjectsByProject(
+        supabase,
+        workflow.project_id
+      );
+      // Filter out objects already in this workflow
+      const objectIdsInWorkflow = steps.flatMap((step) =>
+        step.objects.map((obj) => obj.id)
+      );
+      const available = allObjects.filter(
+        (obj) => !objectIdsInWorkflow.includes(obj.id)
+      );
+      setAvailableObjects(available);
+    } catch (error) {
+      console.error("Failed to load objects:", error);
+    }
+  }
 
   function handleFilterChange(
     type: "priority" | "assignee" | "dueDate",
@@ -432,6 +481,24 @@ export default function WorkflowPage() {
         '[data-state="open"]'
       ) as HTMLElement;
       if (trigger) trigger.click();
+    }
+  }
+
+  function handleOpenLinkDialog(stepId: number) {
+    setTargetStepForLink(stepId);
+    setIsLinkingObject(true);
+  }
+
+  async function handleLinkExistingObject() {
+    if (!selectedObjectId || !targetStepForLink) return;
+
+    try {
+      await linkExistingObject(parseInt(selectedObjectId, 10), targetStepForLink);
+      setIsLinkingObject(false);
+      setSelectedObjectId("");
+      setTargetStepForLink(null);
+    } catch (error) {
+      console.error("Failed to link object:", error);
     }
   }
 
@@ -866,6 +933,7 @@ export default function WorkflowPage() {
                   step={step}
                   onCreateObject={handleCreateObject}
                   onEditStep={handleEditStep}
+                  onLinkObject={handleOpenLinkDialog}
                 >
                   <SortableContext
                     items={step.objects.map((obj) => obj.id)}
@@ -966,6 +1034,60 @@ export default function WorkflowPage() {
               <Button type="submit">Edit Step</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLinkingObject} onOpenChange={setIsLinkingObject}>
+        <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+          <DialogHeader>
+            <DialogTitle>Link Existing Object</DialogTitle>
+            <p className="text-sm text-gray-600">
+              Select an object from the project to link to this workflow
+            </p>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Object</Label>
+              <Select value={selectedObjectId} onValueChange={setSelectedObjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose an object..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableObjects.length === 0 ? (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      No available objects to link
+                    </div>
+                  ) : (
+                    availableObjects.map((obj) => (
+                      <SelectItem key={obj.id} value={obj.id.toString()}>
+                        {obj.title}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-x-2 flex justify-end">
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsLinkingObject(false);
+                  setSelectedObjectId("");
+                  setTargetStepForLink(null);
+                }}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleLinkExistingObject}
+                disabled={!selectedObjectId}
+              >
+                Link Object
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
