@@ -6,7 +6,6 @@ import { useOrganization } from "@clerk/nextjs";
 import Link from "next/link";
 import { LayoutDashboard, Share2 } from "lucide-react";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -270,7 +269,6 @@ function buildGraph(
 function GraphErrorFallback() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <main className="container mx-auto px-4 py-12">
         <EmptyState
           title="Something went wrong"
@@ -586,7 +584,6 @@ function ProjectGraphPageContent() {
   if (!organizationLoaded) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-12">
           <LoadingSpinner label="Loading organization..." />
         </main>
@@ -597,7 +594,7 @@ function ProjectGraphPageContent() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
+
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="No organization selected"
@@ -616,7 +613,6 @@ function ProjectGraphPageContent() {
   if (Number.isNaN(projectIdNum)) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-12">
           <EmptyState
             title="Invalid project"
@@ -632,7 +628,6 @@ function ProjectGraphPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <Breadcrumb className="mb-4">
           <BreadcrumbList>

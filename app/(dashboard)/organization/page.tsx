@@ -6,7 +6,6 @@ import {
   useOrganization,
   useUser,
 } from "@clerk/nextjs";
-import Navbar from "@/components/navbar";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -51,7 +50,6 @@ export default function OrganizationPage() {
   if (organization && !isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
 
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <div className="max-w-xl mx-auto text-center">
@@ -76,7 +74,6 @@ export default function OrganizationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <div className="mb-6">

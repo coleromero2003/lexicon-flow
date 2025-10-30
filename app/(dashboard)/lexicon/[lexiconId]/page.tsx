@@ -7,7 +7,6 @@ import { useOrganization, useUser } from "@clerk/nextjs";
 import { BookOpen, Calendar, ClipboardList, Download, FileText, Layers, Link2, Plus, Save, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -250,7 +249,6 @@ export default function LexiconItemPage() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <div className="text-center">
             <h2 className="mb-4 text-2xl font-bold text-gray-900">
@@ -268,7 +266,6 @@ export default function LexiconItemPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto space-y-6 px-4 py-6 sm:py-8">
           <Skeleton className="h-8 w-72" />
           <Skeleton className="h-6 w-48" />
@@ -286,7 +283,6 @@ export default function LexiconItemPage() {
   if (error || !item) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <Card className="mx-auto max-w-xl">
             <CardHeader>
@@ -310,7 +306,6 @@ export default function LexiconItemPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <Breadcrumb className="mb-4">

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useOrganization } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -131,7 +130,6 @@ export default function ProjectDashboardPage() {
   function renderLoadingState() {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-full max-w-md" />
@@ -154,7 +152,6 @@ export default function ProjectDashboardPage() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="No organization selected"
@@ -168,7 +165,6 @@ export default function ProjectDashboardPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="Unable to load project dashboard"
@@ -187,7 +183,6 @@ export default function ProjectDashboardPage() {
   if (!project) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="Project not found"
@@ -200,7 +195,6 @@ export default function ProjectDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <main className="container mx-auto px-4 py-6 sm:py-8 space-y-8">
         <Breadcrumb>
           <BreadcrumbList>
