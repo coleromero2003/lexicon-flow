@@ -163,6 +163,7 @@ export function AppSidebar() {
         .eq("org_id", organization.id);
 
       if (lexiconItems) {
+        type LexiconItemTypeRow = Pick<LexiconItem, "item_type">;
         const counts = {
           parts: 0,
           workflow_templates: 0,
@@ -171,13 +172,13 @@ export function AppSidebar() {
           specs: 0,
           clients: 0,
         };
-        lexiconItems.forEach((item: LexiconItem) => {
-          if (item.item_type === "part") counts.parts++;
-          else if (item.item_type === "workflow_template") counts.workflow_templates++;
-          else if (item.item_type === "step_template") counts.step_templates++;
-          else if (item.item_type === "document") counts.documents++;
-          else if (item.item_type === "spec") counts.specs++;
-          else if (item.item_type === "client") counts.clients++;
+        (lexiconItems as LexiconItemTypeRow[]).forEach(({ item_type }) => {
+          if (item_type === "part") counts.parts++;
+          else if (item_type === "workflow_template") counts.workflow_templates++;
+          else if (item_type === "step_template") counts.step_templates++;
+          else if (item_type === "document") counts.documents++;
+          else if (item_type === "spec") counts.specs++;
+          else if (item_type === "client") counts.clients++;
         });
         setLexiconCounts(counts);
       }
