@@ -1,10 +1,11 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization, useUser } from "@clerk/nextjs";
-import { BookOpen, Calendar, ClipboardList, Layers, Link2 } from "lucide-react";
+import { BookOpen, Calendar, ClipboardList, Download, FileText, Layers, Link2, Plus, Save, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -22,8 +23,13 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { lexiconService, objectService } from "@/lib/services";
-import type { LexiconItem, ScadaObject } from "@/lib/supabase/models";
+import { lexiconService, objectService, lexiconFileService, fileService } from "@/lib/services";
+import type { LexiconItem, ScadaObject, FileMeta } from "@/lib/supabase/models";
+import { useFileUpload } from "@/lib/hooks/useFileUpload";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const typeLabelMap: Record<LexiconItem["type"], string> = {
   part: "Part",
@@ -45,8 +51,15 @@ export default function LexiconItemPage() {
 
   const [item, setItem] = useState<LexiconItem | null>(null);
   const [linkedObjects, setLinkedObjects] = useState<ScadaObject[]>([]);
+  const [files, setFiles] = useState<FileMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAttributeDialogOpen, setIsAttributeDialogOpen] = useState(false);
+  const [newAttributeKey, setNewAttributeKey] = useState("");
+  const [newAttributeValue, setNewAttributeValue] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { uploadLexiconFile, isUploading } = useFileUpload();
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -74,15 +87,17 @@ export default function LexiconItemPage() {
         setLoading(true);
         setError(null);
 
-        const [lexiconItem, objects] = await Promise.all([
+        const [lexiconItem, objects, lexiconFiles] = await Promise.all([
           lexiconService.getLexiconItem(supabaseClient, lexiconId),
           objectService.getObjectsByLexicon(supabaseClient, lexiconId),
+          lexiconFileService.getFilesForLexicon(supabaseClient, lexiconId),
         ]);
 
         if (!isMounted) return;
 
         setItem(lexiconItem);
         setLinkedObjects(objects);
+        setFiles(lexiconFiles);
       } catch (err) {
         if (!isMounted) return;
         setError(err instanceof Error ? err.message : "Failed to load lexicon item.");
@@ -104,6 +119,121 @@ export default function LexiconItemPage() {
     if (!item) return [] as Array<[string, unknown]>;
     return Object.entries(item.attributes || {});
   }, [item]);
+
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !supabase || !item) return;
+
+    try {
+      const uploadedFile = await uploadLexiconFile({
+        file,
+        lexiconId,
+        lexiconSlug: item.name,
+      });
+      setFiles((prev) => [...prev, uploadedFile]);
+      toast.success("File uploaded successfully");
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err) {
+      console.error("Failed to upload file", err);
+      toast.error("Failed to upload file");
+    }
+  }, [supabase, item, lexiconId, uploadLexiconFile]);
+
+  const handleFileDownload = useCallback(async (file: FileMeta) => {
+    if (!supabase) return;
+
+    try {
+      const { data, error } = await supabase.storage
+        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "lexicon-files")
+        .download(file.storage_key);
+
+      if (error) throw error;
+
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download file", err);
+      toast.error("Failed to download file");
+    }
+  }, [supabase]);
+
+  const handleFileDelete = useCallback(async (file: FileMeta) => {
+    if (!supabase) return;
+
+    try {
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "lexicon-files")
+        .remove([file.storage_key]);
+
+      if (storageError) throw storageError;
+
+      // Delete file metadata
+      await fileService.deleteFile(supabase, file.id);
+
+      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      toast.success("File deleted");
+    } catch (err) {
+      console.error("Failed to delete file", err);
+      toast.error("Failed to delete file");
+    }
+  }, [supabase]);
+
+  const handleAddAttribute = useCallback(async () => {
+    if (!supabase || !item || !newAttributeKey.trim()) {
+      toast.error("Attribute key is required");
+      return;
+    }
+
+    try {
+      const updatedAttributes = {
+        ...item.attributes,
+        [newAttributeKey.trim()]: newAttributeValue.trim(),
+      };
+
+      const updatedItem = await lexiconService.updateLexiconItem(supabase, lexiconId, {
+        attributes: updatedAttributes,
+      });
+
+      setItem(updatedItem);
+      setNewAttributeKey("");
+      setNewAttributeValue("");
+      setIsAttributeDialogOpen(false);
+      toast.success("Attribute added");
+    } catch (err) {
+      console.error("Failed to add attribute", err);
+      toast.error("Failed to add attribute");
+    }
+  }, [supabase, item, lexiconId, newAttributeKey, newAttributeValue]);
+
+  const handleDeleteAttribute = useCallback(async (key: string) => {
+    if (!supabase || !item) return;
+
+    try {
+      const updatedAttributes = { ...item.attributes };
+      delete updatedAttributes[key];
+
+      const updatedItem = await lexiconService.updateLexiconItem(supabase, lexiconId, {
+        attributes: updatedAttributes,
+      });
+
+      setItem(updatedItem);
+      toast.success("Attribute deleted");
+    } catch (err) {
+      console.error("Failed to delete attribute", err);
+      toast.error("Failed to delete attribute");
+    }
+  }, [supabase, item, lexiconId]);
 
   if (!userLoaded) {
     return (
@@ -269,10 +399,60 @@ export default function LexiconItemPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Attributes &amp; notes</CardTitle>
-                <CardDescription>
-                  Structured metadata stored with this item.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Attributes &amp; notes</CardTitle>
+                    <CardDescription>
+                      Structured metadata stored with this item.
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isAttributeDialogOpen} onOpenChange={setIsAttributeDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add attribute</DialogTitle>
+                        <DialogDescription>
+                          Add custom metadata to this lexicon item.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="attr-key">Key</Label>
+                          <Input
+                            id="attr-key"
+                            value={newAttributeKey}
+                            onChange={(e) => setNewAttributeKey(e.target.value)}
+                            placeholder="e.g. voltage_rating"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="attr-value">Value</Label>
+                          <Textarea
+                            id="attr-value"
+                            value={newAttributeValue}
+                            onChange={(e) => setNewAttributeValue(e.target.value)}
+                            placeholder="e.g. 120V AC"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAttributeDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAddAttribute}>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 {attributeEntries.length === 0 ? (
@@ -284,7 +464,12 @@ export default function LexiconItemPage() {
                 ) : (
                   <div className="grid gap-4">
                     {attributeEntries.map(([key, value]) => (
-                      <AttributeTile key={key} name={key} value={value} />
+                      <AttributeTile
+                        key={key}
+                        name={key}
+                        value={value}
+                        onDelete={() => handleDeleteAttribute(key)}
+                      />
                     ))}
                   </div>
                 )}
@@ -293,6 +478,75 @@ export default function LexiconItemPage() {
           </div>
 
           <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Files</CardTitle>
+                    <CardDescription>
+                      Documents and files attached to this item.
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {isUploading ? "Uploading..." : "Upload"}
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {files.length === 0 ? (
+                  <EmptyState
+                    icon={<FileText className="h-8 w-8" />}
+                    title="No files"
+                    description="Upload documents, datasheets, or specs for this item."
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {file.filename}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {file.size_bytes ? `${(file.size_bytes / 1024).toFixed(1)} KB` : "Unknown size"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileDownload(file)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleFileDelete(file)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Associated objects</CardTitle>
@@ -372,9 +626,11 @@ function InfoTile({
 function AttributeTile({
   name,
   value,
+  onDelete,
 }: {
   name: string;
   value: unknown;
+  onDelete?: () => void;
 }) {
   const formattedValue = useMemo(() => {
     if (value === null || value === undefined) {
@@ -401,9 +657,16 @@ function AttributeTile({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <p className="text-xs font-medium uppercase text-gray-500">
-        {displayName}
-      </p>
+      <div className="flex items-start justify-between">
+        <p className="text-xs font-medium uppercase text-gray-500">
+          {displayName}
+        </p>
+        {onDelete && (
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            <Trash2 className="h-3 w-3 text-red-500" />
+          </Button>
+        )}
+      </div>
       {typeof formattedValue === "string" && formattedValue.includes("\n") ? (
         <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
           {formattedValue}

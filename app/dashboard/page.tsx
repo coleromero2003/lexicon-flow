@@ -28,6 +28,8 @@ import { useProjects } from "@/lib/hooks/useProjects";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import {
   BookOpen,
+  CheckSquare,
+  ClipboardList,
   Filter,
   FolderKanban,
   Grid3x3,
@@ -38,7 +40,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSupabase } from "@/lib/supabase/SupabaseProvider";
+import type { ScadaObject, ObjectSubtask } from "@/lib/supabase/models";
+import { Badge } from "@/components/ui/badge";
+
+type ObjectWithProject = ScadaObject & {
+  projects: {
+    id: number;
+    name: string;
+    org_id: string;
+  };
+};
 
 const MAX_NAME_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -89,14 +102,18 @@ function DashboardErrorFallback() {
 
 function ProjectsPageContent() {
   const router = useRouter();
-  const { isSignedIn, isLoaded: userLoaded } = useUser();
+  const { isSignedIn, isLoaded: userLoaded, user } = useUser();
   const { organization } = useOrganization();
+  const { supabase } = useSupabase();
   const { createProject, projects, error, loading, reload } = useProjects();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [isCreatingProject, setIsCreatingProject] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(() => createDefaultFilters());
+  const [assignedObjects, setAssignedObjects] = useState<ObjectWithProject[]>([]);
+  const [assignedTasks, setAssignedTasks] = useState<ObjectSubtask[]>([]);
+  const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -109,6 +126,70 @@ function ProjectsPageContent() {
       setFormError(null);
     }
   }, [isCreatingProject]);
+
+  const loadUserAssignments = useCallback(async () => {
+    if (!supabase || !organization?.id || !user?.id) {
+      setLoadingUserData(false);
+      return;
+    }
+
+    try {
+      setLoadingUserData(true);
+
+      // Fetch all objects for the organization through projects
+      const { data: allObjects, error: objectsError } = await supabase
+        .from("objects")
+        .select(`
+          *,
+          projects!inner(id, name, org_id)
+        `)
+        .eq("projects.org_id", organization.id);
+
+      if (objectsError) {
+        console.error("Objects query error:", objectsError);
+        throw objectsError;
+      }
+
+      // Filter objects where user is in assignee array
+      const userObjects = (allObjects || []).filter((obj: ObjectWithProject) =>
+        obj.assignee && obj.assignee.includes(user.id)
+      );
+
+      setAssignedObjects(userObjects);
+
+      // Fetch all subtasks for user's objects
+      if (userObjects.length > 0) {
+        const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
+        const { data: tasks, error: tasksError } = await supabase
+          .from("object_subtasks")
+          .select("*")
+          .in("object_id", objectIds)
+          .eq("is_done", false)
+          .order("sort_order", { ascending: true });
+
+        if (tasksError) {
+          console.error("Subtasks query error:", tasksError);
+          // Don't throw - just set empty tasks
+          setAssignedTasks([]);
+        } else {
+          setAssignedTasks(tasks || []);
+        }
+      } else {
+        setAssignedTasks([]);
+      }
+    } catch (err) {
+      console.error("Failed to load user assignments", err);
+      // Set empty arrays on error
+      setAssignedObjects([]);
+      setAssignedTasks([]);
+    } finally {
+      setLoadingUserData(false);
+    }
+  }, [supabase, organization, user]);
+
+  useEffect(() => {
+    loadUserAssignments();
+  }, [loadUserAssignments]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
@@ -354,6 +435,121 @@ function ProjectsPageContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* User Assignments Section */}
+        {!loadingUserData && (assignedObjects.length > 0 || assignedTasks.length > 0) && (
+          <div className="mb-6 sm:mb-8 space-y-6">
+            {/* Assigned Objects */}
+            {assignedObjects.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5 text-blue-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        My Assigned Objects
+                      </h2>
+                      <Badge variant="secondary">{assignedObjects.length}</Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {assignedObjects.map((obj) => (
+                      <Link
+                        key={obj.id}
+                        href={`/projects/${obj.project_id}/objects/${obj.id}`}
+                        className="block"
+                      >
+                        <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                          <CardContent className="p-4">
+                            <h3 className="font-semibold text-gray-900 mb-1">
+                              {obj.title}
+                            </h3>
+                            {obj.projects && (
+                              <p className="text-xs text-gray-500 mb-2">
+                                Project: {obj.projects.name}
+                              </p>
+                            )}
+                            {obj.description_md && (
+                              <p className="text-sm text-gray-600 line-clamp-2">
+                                {obj.description_md}
+                              </p>
+                            )}
+                            <div className="mt-2 flex items-center gap-2">
+                              {obj.priority && (
+                                <Badge variant="outline" className="text-xs">
+                                  {obj.priority}
+                                </Badge>
+                              )}
+                              {obj.due_date && (
+                                <span className="text-xs text-gray-500">
+                                  Due: {new Date(obj.due_date).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Assigned Tasks */}
+            {assignedTasks.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-5 w-5 text-green-600" />
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        My Tasks
+                      </h2>
+                      <Badge variant="secondary">{assignedTasks.length}</Badge>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {assignedTasks.slice(0, 10).map((task) => {
+                      const object = assignedObjects.find((obj) => obj.id === task.object_id);
+                      return (
+                        <div
+                          key={task.id}
+                          className="flex items-start justify-between rounded-lg border border-gray-200 p-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900">
+                              {task.title}
+                            </p>
+                            {object && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Object: {object.title}
+                              </p>
+                            )}
+                          </div>
+                          {object && (
+                            <Link
+                              href={`/projects/${object.project_id}/objects/${object.id}`}
+                              className="ml-2"
+                            >
+                              <Button variant="ghost" size="sm">
+                                View
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {assignedTasks.length > 10 && (
+                      <p className="text-sm text-gray-500 text-center pt-2">
+                        +{assignedTasks.length - 10} more tasks
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import Link from "next/link";
-import { RefreshCcw } from "lucide-react";
+import { LayoutDashboard, Share2 } from "lucide-react";
 
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -149,7 +149,10 @@ function getPolarPosition(index: number, total: number, radius: number) {
   };
 }
 
-function buildGraph(GraphLibrary: GraphConstructor, data: GraphData): GraphInstance {
+function buildGraph(
+  GraphLibrary: GraphConstructor,
+  data: GraphData
+): GraphInstance {
   const graph = new GraphLibrary();
 
   const objectCount = data.objects.length;
@@ -271,7 +274,7 @@ function GraphErrorFallback() {
       <main className="container mx-auto px-4 py-12">
         <EmptyState
           title="Something went wrong"
-          description="We couldn&apos;t render the project graph. Please refresh and try again."
+          description="We couldn't render the project graph. Please refresh and try again."
           action={
             <Button onClick={() => window.location.reload()}>
               Reload page
@@ -362,10 +365,7 @@ function ProjectGraphPageContent() {
 
           const [relations, objectFileLinks, objectLexiconLinks] =
             await Promise.all([
-              objectRelationService.getRelationsForObjects(
-                supabase,
-                objectIds
-              ),
+              objectRelationService.getRelationsForObjects(supabase, objectIds),
               objectFileService.getLinksForObjects(supabase, objectIds),
               objectLexiconService.getLinksForObjects(supabase, objectIds),
             ]);
@@ -414,9 +414,7 @@ function ProjectGraphPageContent() {
         if (cancelRef?.current) return;
         console.error("Failed to load project graph", err);
         setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load project graph"
+          err instanceof Error ? err.message : "Failed to load project graph"
         );
         setGraphData(null);
       } finally {
@@ -425,12 +423,7 @@ function ProjectGraphPageContent() {
         }
       }
     },
-    [
-      supabase,
-      projectIdNum,
-      organization,
-      organizationLoaded,
-    ]
+    [supabase, projectIdNum, organization, organizationLoaded]
   );
 
   useEffect(() => {
@@ -465,10 +458,7 @@ function ProjectGraphPageContent() {
     const initSigma = async () => {
       try {
         const [{ default: GraphLibrary }, { default: SigmaLibrary }] =
-          await Promise.all([
-            import("graphology"),
-            import("sigma"),
-          ]);
+          await Promise.all([import("graphology"), import("sigma")]);
 
         if (!containerRef.current || !active) {
           return;
@@ -632,9 +622,7 @@ function ProjectGraphPageContent() {
             title="Invalid project"
             description="The requested project could not be determined."
             action={
-              <Button onClick={() => router.push("/projects")}>
-                Go back
-              </Button>
+              <Button onClick={() => router.push("/projects")}>Go back</Button>
             }
           />
         </main>
@@ -679,21 +667,29 @@ function ProjectGraphPageContent() {
                 System graph {projectName ? `for ${projectName}` : ""}
               </h1>
               <p className="mt-1 text-gray-600">
-                Visualize how objects, files, and lexicon items connect within your project.
+                Visualize how objects, files, and lexicon items connect within
+                your project.
               </p>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void fetchGraphData()}
-                disabled={loading}
-              >
-                <RefreshCcw
-                  className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                />
-                Refresh
-              </Button>
+              <div className="mb-4">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    onClick={() => router.push(`/projects/${projectId}`)}
+                  >
+                    <LayoutDashboard className="h-4 w-4" /> Dashboard
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="flex items-center gap-2"
+                    disabled
+                  >
+                    <Share2 className="h-4 w-4" /> Graph view
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -717,7 +713,9 @@ function ProjectGraphPageContent() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">Lexicon items</CardTitle>
+              <CardTitle className="text-sm text-gray-500">
+                Lexicon items
+              </CardTitle>
               <CardDescription className="text-2xl font-semibold text-gray-900">
                 {graphData?.lexiconItems.length ?? 0}
               </CardDescription>
@@ -725,7 +723,9 @@ function ProjectGraphPageContent() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">Connections</CardTitle>
+              <CardTitle className="text-sm text-gray-500">
+                Connections
+              </CardTitle>
               <CardDescription className="text-2xl font-semibold text-gray-900">
                 {edgeCount}
               </CardDescription>
@@ -737,7 +737,8 @@ function ProjectGraphPageContent() {
           <CardHeader>
             <CardTitle>Graph legend</CardTitle>
             <CardDescription>
-              Colors indicate the node or relationship type inside the graph visualization.
+              Colors indicate the node or relationship type inside the graph
+              visualization.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -820,13 +821,12 @@ function ProjectGraphPageContent() {
               Navigate to {selectedNode?.label}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Would you like to go to the detail page for this
-              {" "}
+              Would you like to go to the detail page for this{" "}
               {selectedNode?.type === "object"
                 ? "object"
                 : selectedNode?.type === "file"
-                  ? "file"
-                  : "lexicon item"}
+                ? "file"
+                : "lexicon item"}
               ?
             </AlertDialogDescription>
           </AlertDialogHeader>

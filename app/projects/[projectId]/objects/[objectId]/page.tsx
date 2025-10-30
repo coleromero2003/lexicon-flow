@@ -10,6 +10,7 @@ import { FileText } from "lucide-react";
 import Navbar from "@/components/navbar";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
+import { BackButton } from "@/components/ui/back-button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -46,8 +47,8 @@ import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { objectService, projectService } from "@/lib/services";
-import type { RelationKind, ScadaObject } from "@/lib/supabase/models";
+import { objectService, projectService, workflowService } from "@/lib/services";
+import type { RelationKind, ScadaObject, Workflow } from "@/lib/supabase/models";
 import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
@@ -101,7 +102,7 @@ export default function ObjectPage() {
   const [editSheetKey, setEditSheetKey] = useState(0);
   type EditInitialValues = {
     title: string;
-    assignee: string;
+    assignee: string[];
     dueDate: Date | undefined;
     priority: PriorityValue;
   };
@@ -109,7 +110,7 @@ export default function ObjectPage() {
   const [editInitialValues, setEditInitialValues] = useState<EditInitialValues>(
     {
       title: "",
-      assignee: "",
+      assignee: [],
       dueDate: undefined,
       priority: (PRIORITIES[1]?.value ?? "medium") as PriorityValue,
     }
@@ -119,6 +120,9 @@ export default function ObjectPage() {
   const [projectObjects, setProjectObjects] = useState<ScadaObject[]>([]);
   const [isLoadingProjectObjects, setIsLoadingProjectObjects] = useState(false);
   const [isLinkingObject, setIsLinkingObject] = useState(false);
+
+  const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -141,9 +145,28 @@ export default function ObjectPage() {
     }
   }, [parsedProjectId, supabase]);
 
+  const loadProjectWorkflows = useCallback(async () => {
+    if (!parsedProjectId || !supabase) return;
+
+    try {
+      setIsLoadingWorkflows(true);
+      const workflows = await workflowService.getWorkflowsByProject(
+        supabase,
+        parsedProjectId
+      );
+      setProjectWorkflows(workflows);
+    } catch (err) {
+      console.error("Failed to load project workflows", err);
+      toast.error("Failed to load project workflows");
+    } finally {
+      setIsLoadingWorkflows(false);
+    }
+  }, [parsedProjectId, supabase]);
+
   useEffect(() => {
     loadProjectObjects();
-  }, [loadProjectObjects]);
+    loadProjectWorkflows();
+  }, [loadProjectObjects, loadProjectWorkflows]);
 
   const storageBucket = useMemo(
     () => "lexicon-files",
@@ -193,7 +216,7 @@ export default function ObjectPage() {
 
     setEditInitialValues({
       title: object.title,
-      assignee: object.assignee || "",
+      assignee: object.assignee || [],
       dueDate: object.due_date ? new Date(object.due_date) : undefined,
       priority: ((object.priority as PriorityValue) ||
         PRIORITIES[1]?.value ||
@@ -244,14 +267,14 @@ export default function ObjectPage() {
     priority,
   }: {
     title: string;
-    assignee: string;
+    assignee: string[];
     dueDate: Date | undefined;
     priority: string;
   }) => {
     try {
       await updateObject({
         title,
-        assignee: assignee || null,
+        assignee: assignee || [],
         due_date: dueDate ? dueDate.toISOString() : null,
         priority: priority as PriorityValue,
       });
@@ -430,6 +453,55 @@ export default function ObjectPage() {
     }
   };
 
+  const handleAddWorkflow = async (workflowId: number, stepId: number) => {
+    if (!object || !supabase) return;
+
+    try {
+      // Add the workflow and step IDs to the object's arrays
+      const currentWorkflowIds = object.workflow_id || [];
+      const currentStepIds = object.step_id || [];
+
+      await updateObject({
+        workflow_id: [...currentWorkflowIds, workflowId],
+        step_id: [...currentStepIds, stepId],
+      });
+
+      toast.success("Object added to workflow");
+    } catch (err) {
+      console.error("Failed to add object to workflow", err);
+      toast.error("Failed to add object to workflow");
+      throw err;
+    }
+  };
+
+  const handleRemoveWorkflow = async (workflowId: number) => {
+    if (!object || !supabase) return;
+
+    try {
+      // Find the index of the workflow to remove
+      const workflowIndex = (object.workflow_id || []).indexOf(workflowId);
+      if (workflowIndex === -1) return;
+
+      // Remove the workflow and its corresponding step
+      const newWorkflowIds = [...(object.workflow_id || [])];
+      const newStepIds = [...(object.step_id || [])];
+
+      newWorkflowIds.splice(workflowIndex, 1);
+      newStepIds.splice(workflowIndex, 1);
+
+      await updateObject({
+        workflow_id: newWorkflowIds,
+        step_id: newStepIds,
+      });
+
+      toast.success("Object removed from workflow");
+    } catch (err) {
+      console.error("Failed to remove object from workflow", err);
+      toast.error("Failed to remove object from workflow");
+      throw err;
+    }
+  };
+
   if (loading || subtasksHook.loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -517,6 +589,8 @@ export default function ObjectPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
+        <BackButton fallbackHref={`/projects/${projectId}/objects`} className="mb-4" />
+
         <ObjectHeader
           object={object}
           orgUsers={organizationUsers.map(({ userId, name }) => ({
@@ -562,7 +636,13 @@ export default function ObjectPage() {
               onChange={handleDescriptionChange}
             />
 
-            <WorkflowsCard workflows={object.workflows} />
+            <WorkflowsCard
+              workflows={object.workflows}
+              availableWorkflows={projectWorkflows}
+              onAddWorkflow={handleAddWorkflow}
+              onRemoveWorkflow={handleRemoveWorkflow}
+              loading={isLoadingWorkflows}
+            />
 
             <SubtasksCard
               subtasks={subtasksHook.subtasks}

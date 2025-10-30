@@ -36,6 +36,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { objectService } from "@/lib/services";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
+import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
+import { OrganizationUserCombobox } from "@/components/people/organization-user-combobox";
+import { BackButton } from "@/components/ui/back-button";
 import Link from "next/link";
 import {
   DndContext,
@@ -62,12 +65,20 @@ function DroppableStep({
   onCreateObject,
   onEditStep,
   onLinkObject,
+  organizationUsers,
+  loadingUsers,
+  assigneeValue,
+  onAssigneeChange,
 }: {
   step: StepWithObjects;
   children: React.ReactNode;
   onCreateObject: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   onEditStep: (step: StepWithObjects) => void;
   onLinkObject: (stepId: number) => void;
+  organizationUsers: Array<{ userId: string; name: string; email?: string }>;
+  loadingUsers: boolean;
+  assigneeValue: string[];
+  onAssigneeChange: (userIds: string[]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: step.id });
   return (
@@ -143,11 +154,16 @@ function DroppableStep({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Assignee</Label>
-                  <Input
-                    id="assignee"
-                    name="assignee"
-                    placeholder="Who should work on this?"
+                  <Label>Assignees</Label>
+                  <OrganizationUserCombobox
+                    users={organizationUsers}
+                    value={assigneeValue}
+                    onChange={onAssigneeChange}
+                    multiple={true}
+                    placeholder="Select assignees..."
+                    searchPlaceholder="Search users..."
+                    emptyText="No users found."
+                    loading={loadingUsers}
                   />
                 </div>
 
@@ -193,7 +209,15 @@ function DroppableStep({
   );
 }
 
-function SortableObject({ object, projectId }: { object: ScadaObject; projectId: string }) {
+function SortableObject({
+  object,
+  projectId,
+  organizationUsers
+}: {
+  object: ScadaObject;
+  projectId: string;
+  organizationUsers: Array<{ userId: string; name: string; email?: string }>;
+}) {
   const router = useRouter();
   const {
     attributes,
@@ -245,16 +269,25 @@ function SortableObject({ object, projectId }: { object: ScadaObject; projectId:
 
             {/* Object Description */}
             <p className="text-xs text-gray-600 line-clamp-2">
-              {object.description_md || "No description."}
+              {object.description_md
+                ? object.description_md
+                    .replace(/[#*_~`>\[\]]/g, '') // Strip markdown symbols
+                    .replace(/\n+/g, ' ') // Replace newlines with spaces
+                    .trim() || "No description."
+                : "No description."}
             </p>
 
             {/* Object Meta */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
-                {object.assignee && (
+                {object.assignee && object.assignee.length > 0 && (
                   <div className="flex items-center space-x-1 text-xs text-gray-500">
                     <User className="h-3 w-3" />
-                    <span className="truncate">{object.assignee}</span>
+                    <span className="truncate">
+                      {object.assignee.length === 1
+                        ? organizationUsers.find(u => u.userId === object.assignee[0])?.name || object.assignee[0]
+                        : `${object.assignee.length} assignees`}
+                    </span>
                   </div>
                 )}
                 {object.due_date && (
@@ -305,16 +338,25 @@ function ObjectOverlay({ object }: { object: ScadaObject }) {
 
           {/* Object Description */}
           <p className="text-xs text-gray-600 line-clamp-2">
-            {object.description_md || "No description."}
+            {object.description_md
+              ? object.description_md
+                  .replace(/[#*_~`>\[\]]/g, '') // Strip markdown symbols
+                  .replace(/\n+/g, ' ') // Replace newlines with spaces
+                  .trim() || "No description."
+              : "No description."}
           </p>
 
           {/* Object Meta */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
-              {object.assignee && (
+              {object.assignee && object.assignee.length > 0 && (
                 <div className="flex items-center space-x-1 text-xs text-gray-500">
                   <User className="h-3 w-3" />
-                  <span className="truncate">{object.assignee}</span>
+                  <span className="truncate">
+                    {object.assignee.length === 1
+                      ? "1 assignee"
+                      : `${object.assignee.length} assignees`}
+                  </span>
                 </div>
               )}
               {object.due_date && (
@@ -351,6 +393,7 @@ export default function WorkflowPage() {
     updateStep,
   } = useWorkflow(workflowId);
   const { supabase } = useSupabase();
+  const { users: organizationUsers, loading: loadingUsers } = useOrganizationUsers();
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -370,6 +413,10 @@ export default function WorkflowPage() {
   const [availableObjects, setAvailableObjects] = useState<ScadaObject[]>([]);
   const [selectedObjectId, setSelectedObjectId] = useState<string>("");
   const [targetStepForLink, setTargetStepForLink] = useState<number | null>(null);
+
+  // Assignee states for the two different create object dialogs (supporting multiple assignees)
+  const [stepDialogAssignee, setStepDialogAssignee] = useState<string[]>([]);
+  const [mainDialogAssignee, setMainDialogAssignee] = useState<string[]>([]);
 
   const [filters, setFilters] = useState({
     priority: [] as string[],
@@ -450,7 +497,7 @@ export default function WorkflowPage() {
   async function createObject(objectData: {
     title: string;
     description?: string;
-    assignee?: string;
+    assignee: string[];
     dueDate?: string;
     priority: "low" | "medium" | "high" | "urgent";
   }) {
@@ -462,13 +509,13 @@ export default function WorkflowPage() {
     await createRealObject(targetStep.id, objectData);
   }
 
-  async function handleCreateObject(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreateObjectFromStep(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const objectData = {
       title: formData.get("title") as string,
       description: (formData.get("description") as string) || undefined,
-      assignee: (formData.get("assignee") as string) || undefined,
+      assignee: stepDialogAssignee,
       dueDate: (formData.get("dueDate") as string) || undefined,
       priority:
         (formData.get("priority") as "low" | "medium" | "high" | "urgent") || "medium",
@@ -476,6 +523,30 @@ export default function WorkflowPage() {
 
     if (objectData.title.trim()) {
       await createObject(objectData);
+      setStepDialogAssignee([]); // Reset assignees after creation
+
+      const trigger = document.querySelector(
+        '[data-state="open"]'
+      ) as HTMLElement;
+      if (trigger) trigger.click();
+    }
+  }
+
+  async function handleCreateObjectFromMain(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const objectData = {
+      title: formData.get("title") as string,
+      description: (formData.get("description") as string) || undefined,
+      assignee: mainDialogAssignee,
+      dueDate: (formData.get("dueDate") as string) || undefined,
+      priority:
+        (formData.get("priority") as "low" | "medium" | "high" | "urgent") || "medium",
+    };
+
+    if (objectData.title.trim()) {
+      await createObject(objectData);
+      setMainDialogAssignee([]); // Reset assignees after creation
 
       const trigger = document.querySelector(
         '[data-state="open"]'
@@ -830,6 +901,8 @@ export default function WorkflowPage() {
             </BreadcrumbList>
           </Breadcrumb>
 
+          <BackButton fallbackHref={`/projects/${projectId}/workflows`} className="mb-4" />
+
           {/* Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
             <div className="flex flex-wrap items-center gap-4 sm:gap-6">
@@ -855,7 +928,7 @@ export default function WorkflowPage() {
                   </p>
                 </DialogHeader>
 
-                <form className="space-y-4" onSubmit={handleCreateObject}>
+                <form className="space-y-4" onSubmit={handleCreateObjectFromMain}>
                   <div className="space-y-2">
                     <Label>Title *</Label>
                     <Input
@@ -874,11 +947,16 @@ export default function WorkflowPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Assignee</Label>
-                    <Input
-                      id="assignee"
-                      name="assignee"
-                      placeholder="Who should work on this?"
+                    <Label>Assignees</Label>
+                    <OrganizationUserCombobox
+                      users={organizationUsers}
+                      value={mainDialogAssignee}
+                      onChange={setMainDialogAssignee}
+                      multiple={true}
+                      placeholder="Select assignees..."
+                      searchPlaceholder="Search users..."
+                      emptyText="No users found."
+                      loading={loadingUsers}
                     />
                   </div>
 
@@ -931,9 +1009,13 @@ export default function WorkflowPage() {
                 <DroppableStep
                   key={key}
                   step={step}
-                  onCreateObject={handleCreateObject}
+                  onCreateObject={handleCreateObjectFromStep}
                   onEditStep={handleEditStep}
                   onLinkObject={handleOpenLinkDialog}
+                  organizationUsers={organizationUsers}
+                  loadingUsers={loadingUsers}
+                  assigneeValue={stepDialogAssignee}
+                  onAssigneeChange={setStepDialogAssignee}
                 >
                   <SortableContext
                     items={step.objects.map((obj) => obj.id)}
@@ -941,7 +1023,12 @@ export default function WorkflowPage() {
                   >
                     <div className="space-y-3">
                       {step.objects.map((obj, key) => (
-                        <SortableObject object={obj} projectId={projectId} key={key} />
+                        <SortableObject
+                          object={obj}
+                          projectId={projectId}
+                          organizationUsers={organizationUsers}
+                          key={key}
+                        />
                       ))}
                     </div>
                   </SortableContext>

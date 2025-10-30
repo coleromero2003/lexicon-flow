@@ -356,67 +356,63 @@ export default function LexiconPage() {
                       />
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Type</Label>
-                        <Select
-                          value={formState.type}
-                          onValueChange={(value) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              type: value as LexiconType,
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {LEXICON_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {LEXICON_TYPE_LABELS[type]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="lexicon-version">Version</Label>
-                        <Input
-                          id="lexicon-version"
-                          type="number"
-                          min={1}
-                          value={formState.version}
-                          onChange={(event) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              version:
-                                event.target.value === ""
-                                  ? 1
-                                  : Number(event.target.value),
-                            }))
-                          }
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <Select
+                        value={formState.type}
+                        onValueChange={(value) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            type: value as LexiconType,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEXICON_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {LEXICON_TYPE_LABELS[type]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="lexicon-manufacturer">Manufacturer</Label>
-                        <Input
-                          id="lexicon-manufacturer"
-                          value={formState.manufacturer}
-                          onChange={(event) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              manufacturer: event.target.value,
-                            }))
-                          }
-                          placeholder="e.g. Rockwell Automation"
-                        />
-                      </div>
+                    {formState.type === "part" ? (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="lexicon-manufacturer">Manufacturer</Label>
+                          <Input
+                            id="lexicon-manufacturer"
+                            value={formState.manufacturer}
+                            onChange={(event) =>
+                              setFormState((prev) => ({
+                                ...prev,
+                                manufacturer: event.target.value,
+                              }))
+                            }
+                            placeholder="e.g. Rockwell Automation"
+                          />
+                        </div>
 
+                        <div className="space-y-2">
+                          <Label htmlFor="lexicon-sku">SKU / Catalog number</Label>
+                          <Input
+                            id="lexicon-sku"
+                            value={formState.sku}
+                            onChange={(event) =>
+                              setFormState((prev) => ({
+                                ...prev,
+                                sku: event.target.value,
+                              }))
+                            }
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </div>
+                    ) : (
                       <div className="space-y-2">
                         <Label htmlFor="lexicon-sku">SKU / Catalog number</Label>
                         <Input
@@ -431,7 +427,7 @@ export default function LexiconPage() {
                           placeholder="Optional"
                         />
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="lexicon-notes">Notes</Label>
@@ -591,52 +587,48 @@ export default function LexiconPage() {
                     : undefined;
 
                 return (
-                  <Card
-                    key={item.id}
-                    className="transition-shadow hover:shadow-md"
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base text-gray-900">
-                            {item.name}
-                          </CardTitle>
-                          <CardDescription>
-                            {item.manufacturer || "Manufacturer TBD"}
-                          </CardDescription>
+                  <Link key={item.id} href={`/lexicon/${item.id}`}>
+                    <Card className="transition-all hover:shadow-md cursor-pointer">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <CardTitle className="text-base text-gray-900">
+                              {item.name}
+                            </CardTitle>
+                            <CardDescription>
+                              {item.manufacturer || "Manufacturer TBD"}
+                            </CardDescription>
+                          </div>
+                          <Badge variant="secondary">
+                            {LEXICON_TYPE_LABELS[item.type]}
+                          </Badge>
                         </div>
-                        <Badge variant="secondary">
-                          {LEXICON_TYPE_LABELS[item.type]}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-xs font-medium uppercase text-gray-500">
-                            SKU
-                          </p>
-                          <p className="text-gray-900">
-                            {item.sku ? item.sku : "—"}
-                          </p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs font-medium uppercase text-gray-500">
+                              SKU
+                            </p>
+                            <p className="text-gray-900">
+                              {item.sku ? item.sku : "—"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium uppercase text-gray-500">
+                              Version
+                            </p>
+                            <p className="text-gray-900">{item.version}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-medium uppercase text-gray-500">
-                            Version
+                        {notes && (
+                          <p className="line-clamp-2 text-sm text-gray-600">
+                            {notes}
                           </p>
-                          <p className="text-gray-900">{item.version}</p>
-                        </div>
-                      </div>
-                      {notes && (
-                        <p className="line-clamp-2 text-sm text-gray-600">
-                          {notes}
-                        </p>
-                      )}
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/lexicon/${item.id}`}>View details</Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Link>
                 );
               })}
             </div>

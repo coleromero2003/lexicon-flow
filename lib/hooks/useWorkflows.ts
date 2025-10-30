@@ -169,7 +169,7 @@ export function useWorkflow(workflowId: number) {
     objectData: {
       title: string;
       description?: string;
-      assignee?: string;
+      assignee: string[];
       dueDate?: string;
       priority?: "low" | "medium" | "high" | "urgent";
     }
@@ -181,7 +181,7 @@ export function useWorkflow(workflowId: number) {
       const newObject = await objectService.createObject(supabase, {
         title: objectData.title,
         description_md: objectData.description || null,
-        assignee: objectData.assignee || null,
+        assignee: objectData.assignee,
         due_date: objectData.dueDate || null,
         step_id: [stepId],
         workflow_id: [workflow.id],

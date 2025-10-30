@@ -741,6 +741,21 @@ export const lexiconService = {
     if (error) throw error;
     return data;
   },
+
+  async updateLexiconItem(
+    supabase: SupabaseClient,
+    lexiconId: number,
+    updates: Partial<Omit<LexiconItem, "id" | "created_at" | "updated_at" | "org_id">>
+  ): Promise<LexiconItem> {
+    const { data, error } = await supabase
+      .from("lexicon_items")
+      .update(updates)
+      .eq("id", lexiconId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };
 
 // =======================
