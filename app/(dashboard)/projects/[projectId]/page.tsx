@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
 import { FileMeta, Project, ScadaObject, Workflow } from "@/lib/supabase/models";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 import {
   FolderKanban,
   LayoutDashboard,
@@ -491,19 +492,3 @@ function BadgeByPriority({ priority }: PriorityBadgeProps) {
   );
 }
 
-function formatFileSize(sizeBytes: FileMeta["size_bytes"]) {
-  if (!sizeBytes || sizeBytes <= 0) {
-    return "Unknown size";
-  }
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = sizeBytes;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${size.toFixed(size < 10 && unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
-}
