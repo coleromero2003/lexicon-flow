@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { useOrganization, UserButton, useUser } from "@clerk/nextjs";
 import {
   Building2,
@@ -11,11 +12,9 @@ import {
   Box,
   Network,
   FileText,
-  BookOpen,
-  ClipboardList,
-  CheckSquare,
-  AlertCircle,
-  FileStack,
+  ArrowLeft,
+  ArrowRight,
+  LayoutDashboard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,168 +28,19 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuBadge,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useProjects } from "@/lib/hooks/useProjects";
-import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { useState, useEffect, useCallback } from "react";
-import type { ScadaObject, ObjectSubtask, LexiconItem } from "@/lib/supabase/models";
-
-type ObjectWithProject = ScadaObject & {
-  projects: {
-    id: number;
-    name: string;
-    org_id: string;
-  };
-};
+import { useState, useEffect } from "react";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { organization } = useOrganization();
   const { user } = useUser();
-  const { projects, loading: projectsLoading } = useProjects();
-  const { supabase } = useSupabase();
+  const { projects } = useProjects();
 
-  const [assignedObjects, setAssignedObjects] = useState<ObjectWithProject[]>([]);
-  const [assignedTasks, setAssignedTasks] = useState<ObjectSubtask[]>([]);
-  const [lexiconCounts, setLexiconCounts] = useState({
-    parts: 0,
-    workflow_templates: 0,
-    step_templates: 0,
-    documents: 0,
-    specs: 0,
-    clients: 0,
-  });
-  const [objectPriorityCounts, setObjectPriorityCounts] = useState({
-    low: 0,
-    medium: 0,
-    high: 0,
-    urgent: 0,
-  });
-  const [loadingUserData, setLoadingUserData] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-
-  // Load user assignments
-  const loadUserAssignments = useCallback(async () => {
-    if (!supabase || !organization?.id || !user?.id) {
-      setLoadingUserData(false);
-      return;
-    }
-
-    try {
-      setLoadingUserData(true);
-
-      // Fetch all objects for the organization through projects
-      const { data: allObjects, error: objectsError } = await supabase
-        .from("objects")
-        .select(`
-          *,
-          projects!inner(id, name, org_id)
-        `)
-        .eq("projects.org_id", organization.id);
-
-      if (objectsError) throw objectsError;
-
-      // Filter objects where user is in assignee array
-      const userObjects = (allObjects || []).filter((obj: ObjectWithProject) =>
-        obj.assignee && obj.assignee.includes(user.id)
-      );
-
-      setAssignedObjects(userObjects);
-
-      // Fetch all subtasks for user's objects
-      if (userObjects.length > 0) {
-        const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
-        const { data: tasks, error: tasksError } = await supabase
-          .from("object_subtasks")
-          .select("*")
-          .in("object_id", objectIds)
-          .eq("is_done", false)
-          .order("sort_order", { ascending: true });
-
-        if (tasksError) {
-          console.error("Subtasks query error:", tasksError);
-          setAssignedTasks([]);
-        } else {
-          setAssignedTasks(tasks || []);
-        }
-      } else {
-        setAssignedTasks([]);
-      }
-
-      // Fetch object priority counts
-      const { data: allOrgObjects } = await supabase
-        .from("objects")
-        .select(`
-          priority,
-          projects!inner(org_id)
-        `)
-        .eq("projects.org_id", organization.id);
-
-      if (allOrgObjects) {
-        const counts = {
-          low: 0,
-          medium: 0,
-          high: 0,
-          urgent: 0,
-        };
-        (allOrgObjects as Pick<ScadaObject, "priority">[]).forEach((obj) => {
-          if (obj.priority) {
-            counts[obj.priority as keyof typeof counts]++;
-          }
-        });
-        setObjectPriorityCounts(counts);
-      }
-    } catch (err) {
-      console.error("Failed to load user assignments", err);
-      setAssignedObjects([]);
-      setAssignedTasks([]);
-    } finally {
-      setLoadingUserData(false);
-    }
-  }, [supabase, organization, user]);
-
-  // Load lexicon counts
-  const loadLexiconCounts = useCallback(async () => {
-    if (!supabase || !organization?.id) return;
-
-    try {
-      const { data: lexiconItems } = await supabase
-        .from("lexicon_items")
-        .select("type")
-        .eq("org_id", organization.id);
-
-      if (lexiconItems) {
-        type LexiconItemTypeRow = Pick<LexiconItem, "type">;
-        const counts = {
-          parts: 0,
-          workflow_templates: 0,
-          step_templates: 0,
-          documents: 0,
-          specs: 0,
-          clients: 0,
-        };
-        (lexiconItems as LexiconItemTypeRow[]).forEach(({ type }) => {
-          if (type === "part") counts.parts++;
-          else if (type === "workflow_template") counts.workflow_templates++;
-          else if (type === "step_template") counts.step_templates++;
-          else if (type === "document") counts.documents++;
-          else if (type === "spec") counts.specs++;
-          else if (type === "client") counts.clients++;
-        });
-        setLexiconCounts(counts);
-      }
-    } catch (err) {
-      console.error("Failed to load lexicon counts", err);
-    }
-  }, [supabase, organization]);
-
-  useEffect(() => {
-    loadUserAssignments();
-    loadLexiconCounts();
-  }, [loadUserAssignments, loadLexiconCounts]);
 
   // Extract project ID from pathname
   useEffect(() => {
@@ -206,47 +56,36 @@ export function AppSidebar() {
     ? projects.find((p) => p.id === selectedProjectId)
     : null;
 
+  const handleBack = () => router.back();
+  const handleForward = () => router.forward();
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-blue-600 text-white text-xs">
-              LF
-            </AvatarFallback>
-          </Avatar>
+        <Link
+          href="/"
+          className="flex items-center gap-2 px-2 py-2 hover:opacity-90 transition"
+        >
+          <Image
+            src="/logo.svg"
+            alt="Lexicon Flow"
+            width={32}
+            height={32}
+            className="h-8 w-8"
+          />
           <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-semibold truncate">Lexicon Flow</p>
             <p className="text-xs text-muted-foreground truncate">
               {organization?.name || "No Organization"}
             </p>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Organization Context & Settings */}
+        {/* Dashboard access */}
         <SidebarGroup>
-          <SidebarGroupLabel>Organization</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Organization Settings">
-                  <Link href="/organization">
-                    <Building2 />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        {/* Project Overview & Creation */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Projects</SidebarGroupLabel>
+          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
           <SidebarGroupAction asChild>
             <Link href="/dashboard?action=create">
               <Plus className="h-4 w-4" />
@@ -262,11 +101,8 @@ export function AppSidebar() {
                   tooltip="All Projects"
                 >
                   <Link href="/dashboard">
-                    <FolderKanban />
-                    <span>All Projects</span>
-                    {!projectsLoading && (
-                      <SidebarMenuBadge>{projects.length}</SidebarMenuBadge>
-                    )}
+                    <LayoutDashboard />
+                    <span>Dashboard</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -276,49 +112,34 @@ export function AppSidebar() {
 
         <SidebarSeparator />
 
-        {/* My Work Queue */}
-        {!loadingUserData && (assignedObjects.length > 0 || assignedTasks.length > 0) && (
-          <>
-            <SidebarGroup>
-              <SidebarGroupLabel>My Work</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {assignedObjects.length > 0 && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={`${assignedObjects.length} Assigned Objects`}
-                      >
-                        <Link href="/dashboard#my-objects">
-                          <ClipboardList />
-                          <span>My Objects</span>
-                          <SidebarMenuBadge>{assignedObjects.length}</SidebarMenuBadge>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
-                  {assignedTasks.length > 0 && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        asChild
-                        tooltip={`${assignedTasks.length} Tasks`}
-                      >
-                        <Link href="/dashboard#my-tasks">
-                          <CheckSquare />
-                          <span>My Tasks</span>
-                          <SidebarMenuBadge>{assignedTasks.length}</SidebarMenuBadge>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            <SidebarSeparator />
-          </>
-        )}
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleBack} tooltip="Go Back">
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={handleForward} tooltip="Go Forward">
+                  <ArrowRight className="h-4 w-4" />
+                  <span>Forward</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Return to Dashboard">
+                  <Link href="/dashboard">
+                    <FolderKanban />
+                    <span>Go to Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
-        {/* Project Navigation Shortcuts - Only show when a project is selected */}
         {selectedProject && (
           <>
             <SidebarGroup>
@@ -404,114 +225,15 @@ export function AppSidebar() {
           </>
         )}
 
-        {/* Object Management Tools */}
         <SidebarGroup>
-          <SidebarGroupLabel>Object Management</SidebarGroupLabel>
+          <SidebarGroupLabel>Organization</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="All Objects">
-                  <Link href="/objects">
-                    <Box />
-                    <span>All Objects</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {objectPriorityCounts.urgent > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Urgent Objects">
-                    <Link href="/objects?priority=urgent">
-                      <AlertCircle className="text-red-600" />
-                      <span>Urgent</span>
-                      <SidebarMenuBadge className="bg-red-100 text-red-600">
-                        {objectPriorityCounts.urgent}
-                      </SidebarMenuBadge>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        {/* Lexicon & Reusable Assets */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Lexicon Library</SidebarGroupLabel>
-          <SidebarGroupAction asChild>
-            <Link href="/lexicon?action=create">
-              <Plus className="h-4 w-4" />
-              <span className="sr-only">Add Lexicon Item</span>
-            </Link>
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/lexicon"}
-                  tooltip="All Lexicon Items"
-                >
-                  <Link href="/lexicon">
-                    <BookOpen />
-                    <span>All Items</span>
-                    <SidebarMenuBadge>
-                      {Object.values(lexiconCounts).reduce((a, b) => a + b, 0)}
-                    </SidebarMenuBadge>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {lexiconCounts.parts > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Parts">
-                    <Link href="/lexicon?type=part">
-                      <Box className="h-4 w-4" />
-                      <span>Parts</span>
-                      <SidebarMenuBadge>{lexiconCounts.parts}</SidebarMenuBadge>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              {lexiconCounts.documents > 0 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Documents">
-                    <Link href="/lexicon?type=document">
-                      <FileText className="h-4 w-4" />
-                      <span>Documents</span>
-                      <SidebarMenuBadge>{lexiconCounts.documents}</SidebarMenuBadge>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        {/* Files & Reporting */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Files & Reports</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === "/files"}
-                  tooltip="All Files"
-                >
-                  <Link href="/files">
-                    <FileStack />
-                    <span>All Files</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Generate Report">
-                  <Link href="/reports">
-                    <FileText />
-                    <span>Generate Report</span>
+                <SidebarMenuButton asChild tooltip="Organization Settings">
+                  <Link href="/organization">
+                    <Building2 />
+                    <span>Settings</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
