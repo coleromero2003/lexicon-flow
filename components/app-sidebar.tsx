@@ -159,11 +159,11 @@ export function AppSidebar() {
     try {
       const { data: lexiconItems } = await supabase
         .from("lexicon_items")
-        .select("item_type")
+        .select("type")
         .eq("org_id", organization.id);
 
       if (lexiconItems) {
-        type LexiconItemTypeRow = Pick<LexiconItem, "item_type">;
+        type LexiconItemTypeRow = Pick<LexiconItem, "type">;
         const counts = {
           parts: 0,
           workflow_templates: 0,
@@ -172,13 +172,13 @@ export function AppSidebar() {
           specs: 0,
           clients: 0,
         };
-        (lexiconItems as LexiconItemTypeRow[]).forEach(({ item_type }) => {
-          if (item_type === "part") counts.parts++;
-          else if (item_type === "workflow_template") counts.workflow_templates++;
-          else if (item_type === "step_template") counts.step_templates++;
-          else if (item_type === "document") counts.documents++;
-          else if (item_type === "spec") counts.specs++;
-          else if (item_type === "client") counts.clients++;
+        (lexiconItems as LexiconItemTypeRow[]).forEach(({ type }) => {
+          if (type === "part") counts.parts++;
+          else if (type === "workflow_template") counts.workflow_templates++;
+          else if (type === "step_template") counts.step_templates++;
+          else if (type === "document") counts.documents++;
+          else if (type === "spec") counts.specs++;
+          else if (type === "client") counts.clients++;
         });
         setLexiconCounts(counts);
       }
