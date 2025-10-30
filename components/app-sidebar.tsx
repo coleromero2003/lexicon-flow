@@ -12,7 +12,6 @@ import {
   Network,
   FileText,
   BookOpen,
-  Settings,
   ClipboardList,
   CheckSquare,
   AlertCircle,
@@ -33,15 +32,11 @@ import {
   SidebarMenuBadge,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useState, useEffect, useCallback } from "react";
 import type { ScadaObject, ObjectSubtask, LexiconItem } from "@/lib/supabase/models";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 
 type ObjectWithProject = ScadaObject & {
   projects: {
@@ -141,7 +136,7 @@ export function AppSidebar() {
           high: 0,
           urgent: 0,
         };
-        allOrgObjects.forEach((obj: any) => {
+        (allOrgObjects as Pick<ScadaObject, "priority">[]).forEach((obj) => {
           if (obj.priority) {
             counts[obj.priority as keyof typeof counts]++;
           }
@@ -164,10 +159,11 @@ export function AppSidebar() {
     try {
       const { data: lexiconItems } = await supabase
         .from("lexicon_items")
-        .select("item_type")
+        .select("type")
         .eq("org_id", organization.id);
 
       if (lexiconItems) {
+        type LexiconItemTypeRow = Pick<LexiconItem, "type">;
         const counts = {
           parts: 0,
           workflow_templates: 0,
@@ -176,13 +172,13 @@ export function AppSidebar() {
           specs: 0,
           clients: 0,
         };
-        lexiconItems.forEach((item: LexiconItem) => {
-          if (item.item_type === "part") counts.parts++;
-          else if (item.item_type === "workflow_template") counts.workflow_templates++;
-          else if (item.item_type === "step_template") counts.step_templates++;
-          else if (item.item_type === "document") counts.documents++;
-          else if (item.item_type === "spec") counts.specs++;
-          else if (item.item_type === "client") counts.clients++;
+        (lexiconItems as LexiconItemTypeRow[]).forEach(({ type }) => {
+          if (type === "part") counts.parts++;
+          else if (type === "workflow_template") counts.workflow_templates++;
+          else if (type === "step_template") counts.step_templates++;
+          else if (type === "document") counts.documents++;
+          else if (type === "spec") counts.specs++;
+          else if (type === "client") counts.clients++;
         });
         setLexiconCounts(counts);
       }
