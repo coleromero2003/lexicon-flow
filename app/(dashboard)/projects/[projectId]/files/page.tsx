@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -119,7 +118,6 @@ export default function ProjectFilesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-full max-w-md" />
@@ -137,7 +135,6 @@ export default function ProjectFilesPage() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">No Organization Selected</h2>
@@ -151,7 +148,6 @@ export default function ProjectFilesPage() {
   if (error || !project) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
@@ -171,8 +167,6 @@ export default function ProjectFilesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <Breadcrumb className="mb-4">
           <BreadcrumbList>

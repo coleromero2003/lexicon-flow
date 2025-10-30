@@ -816,7 +816,7 @@ export default function WorkflowPage() {
         </Dialog>
 
         {/* Workflow Content */}
-        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+        <main className="w-full max-w-full px-2 sm:px-4 py-4 sm:py-6">
           <BackButton fallbackHref={`/projects/${projectId}/workflows`} className="mb-4" />
 
           {/* Stats */}
@@ -919,7 +919,7 @@ export default function WorkflowPage() {
             lg:pb-6 lg:px-2 lg:-mx-2 lg:[&::-webkit-scrollbar]:h-2
             lg:[&::-webkit-scrollbar-track]:bg-gray-100
             lg:[&::-webkit-scrollbar-thumb]:bg-gray-300 lg:[&::-webkit-scrollbar-thumb]:rounded-full
-            space-y-4 lg:space-y-0"
+            space-y-4 lg:space-y-0 max-w-full"
             >
               {filteredSteps.map((step, key) => (
                 <DroppableStep

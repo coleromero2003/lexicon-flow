@@ -84,7 +84,21 @@ export function useWorkflows(projectId: number) {
     }
   }
 
-  return { workflows, loading, error, createWorkflow };
+  async function deleteWorkflow(workflowId: number) {
+    if (!supabase) throw new Error("Supabase client not initialized");
+
+    try {
+      await workflowService.deleteWorkflow(supabase, workflowId);
+      setWorkflows((prev) => prev.filter((w) => w.id !== workflowId));
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete workflow."
+      );
+      throw err;
+    }
+  }
+
+  return { workflows, loading, error, createWorkflow, deleteWorkflow };
 }
 
 export function useWorkflow(workflowId: number) {
@@ -289,6 +303,18 @@ export function useWorkflow(workflowId: number) {
     }
   }
 
+  async function deleteStep(stepId: number) {
+    if (!supabase) throw new Error("Supabase client not initialized");
+
+    try {
+      await stepService.deleteStep(supabase, stepId);
+      setSteps((prev) => prev.filter((s) => s.id !== stepId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete step.");
+      throw err;
+    }
+  }
+
   async function linkExistingObject(objectId: number, stepId: number) {
     try {
       if (!workflow) throw new Error("Workflow not loaded");
@@ -330,5 +356,6 @@ export function useWorkflow(workflowId: number) {
     moveObject,
     createStep,
     updateStep,
+    deleteStep,
   };
 }

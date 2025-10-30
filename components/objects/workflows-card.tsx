@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { stepService } from "@/lib/services";
 import {
@@ -48,6 +49,7 @@ interface WorkflowInfo {
 interface WorkflowsCardProps {
   workflows: WorkflowInfo[];
   availableWorkflows: WorkflowType[];
+  projectId: number;
   onAddWorkflow: (workflowId: number, stepId: number) => Promise<void>;
   onRemoveWorkflow: (workflowId: number) => Promise<void>;
   loading?: boolean;
@@ -56,6 +58,7 @@ interface WorkflowsCardProps {
 export function WorkflowsCard({
   workflows,
   availableWorkflows,
+  projectId,
   onAddWorkflow,
   onRemoveWorkflow,
 }: WorkflowsCardProps) {
@@ -245,13 +248,16 @@ export function WorkflowsCard({
                 key={index}
                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
               >
-                <div className="flex items-center gap-3 flex-1">
+                <Link
+                  href={`/projects/${projectId}/workflows/${workflow.id}`}
+                  className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                >
                   <div
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: workflow.color }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-gray-900">
+                    <p className="font-medium text-sm text-gray-900 hover:text-blue-600 transition-colors">
                       {workflow.name}
                     </p>
                     {workflow.description && (
@@ -260,7 +266,7 @@ export function WorkflowsCard({
                       </p>
                     )}
                   </div>
-                </div>
+                </Link>
                 <div className="flex items-center gap-2">
                   {step && (
                     <Badge variant="outline" className="text-xs">
@@ -271,7 +277,10 @@ export function WorkflowsCard({
                     variant="ghost"
                     size="sm"
                     className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleRemoveWorkflow(workflow.id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleRemoveWorkflow(workflow.id);
+                    }}
                     disabled={removingWorkflowId === workflow.id}
                   >
                     <X className="h-4 w-4" />

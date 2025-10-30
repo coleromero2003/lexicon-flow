@@ -377,6 +377,33 @@ export default function ObjectPage() {
     [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
   );
 
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      if (!object) {
+        toast.error("Object data is still loading");
+        return;
+      }
+
+      try {
+        await uploadObjectFile({
+          file,
+          projectId: parsedProjectId,
+          objectId: parsedObjectId,
+          objectSlug: object.title,
+        });
+
+        await reloadFiles();
+        toast.success("File uploaded");
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload file"
+        );
+      }
+    },
+    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+  );
+
   const handleViewFile = openObjectFile;
 
   const handleOpenLinkDialog = useCallback(() => {
@@ -575,6 +602,7 @@ export default function ObjectPage() {
             <WorkflowsCard
               workflows={object.workflows}
               availableWorkflows={projectWorkflows}
+              projectId={parsedProjectId}
               onAddWorkflow={handleAddWorkflow}
               onRemoveWorkflow={handleRemoveWorkflow}
               loading={isLoadingWorkflows}
@@ -591,6 +619,7 @@ export default function ObjectPage() {
             <FilesCard
               files={objectFiles}
               onUpload={handleUploadClick}
+              onFileDrop={handleFileDrop}
               onUnlink={handleUnlinkFile}
               onDelete={handleDeleteFile}
               onView={handleViewFile}

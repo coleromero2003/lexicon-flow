@@ -565,7 +565,7 @@ export default function LexiconPage() {
                             <p className="text-xs font-medium uppercase text-gray-500">
                               SKU
                             </p>
-                            <p className="text-gray-900">
+                            <p className="text-lg font-semibold text-gray-900">
                               {item.sku ? item.sku : "—"}
                             </p>
                           </div>

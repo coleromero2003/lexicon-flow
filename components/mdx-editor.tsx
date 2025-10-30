@@ -43,6 +43,20 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
     return (
       <div className={className || "border rounded-md overflow-hidden"}>
         <style jsx global>{`
+          /* Fix toolbar layout and button positioning */
+          .mdxeditor-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+          }
+
+          .mdxeditor-toolbar > * {
+            display: flex;
+            align-items: center;
+          }
+
           /* Ensure headings are styled in the editor */
           .mdxeditor-root-contenteditable h1 {
             font-size: 2em;

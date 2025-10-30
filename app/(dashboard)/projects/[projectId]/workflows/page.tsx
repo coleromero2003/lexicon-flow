@@ -15,6 +15,16 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NoOrganizationState } from "@/components/ui/no-organization-state";
@@ -31,8 +41,10 @@ import {
   Plus,
   Search,
   Share2,
+  Trash2,
   Workflow as WorkflowIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -42,11 +54,13 @@ export default function WorkflowsPage() {
   const projectIdNum = parseInt(projectId, 10);
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
-  const { createWorkflow, workflows, error } = useWorkflows(projectIdNum);
+  const { createWorkflow, deleteWorkflow, workflows, error } = useWorkflows(projectIdNum);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState<boolean>(false);
   const [projectName, setProjectName] = useState<string>("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [workflowToDelete, setWorkflowToDelete] = useState<Workflow | null>(null);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -94,6 +108,19 @@ export default function WorkflowsPage() {
     if (name.trim()) {
       await createWorkflow({ name, description, color: color || "#3b82f6" });
       setIsCreatingWorkflow(false);
+    }
+  };
+
+  const handleDeleteWorkflow = async () => {
+    if (!workflowToDelete) return;
+
+    try {
+      await deleteWorkflow(workflowToDelete.id);
+      toast.success("Workflow deleted successfully");
+      setDeleteDialogOpen(false);
+      setWorkflowToDelete(null);
+    } catch {
+      toast.error("Failed to delete workflow");
     }
   };
 
@@ -254,22 +281,37 @@ export default function WorkflowsPage() {
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {filteredWorkflows.map((workflow) => (
-                <Link
-                  href={`/projects/${projectId}/workflows/${workflow.id}`}
-                  key={workflow.id}
-                >
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div
-                          className={`w-4 h-4 rounded`}
-                          style={{ backgroundColor: workflow.color }}
-                        />
-                        <Badge className="text-xs" variant="secondary">
-                          New
-                        </Badge>
-                      </div>
-                    </CardHeader>
+                <div key={workflow.id} className="relative">
+                  <Link
+                    href={`/projects/${projectId}/workflows/${workflow.id}`}
+                  >
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div
+                            className={`w-4 h-4 rounded`}
+                            style={{ backgroundColor: workflow.color }}
+                          />
+                          <div className="flex items-center gap-2">
+                            <Badge className="text-xs" variant="secondary">
+                              New
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setWorkflowToDelete(workflow);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
                     <CardContent className="p-4 sm:p-6">
                       <CardTitle className="text-base sm:text-lg mb-2 group-hover:text-blue-600 transition-colors">
                         {workflow.name}
@@ -290,6 +332,7 @@ export default function WorkflowsPage() {
                     </CardContent>
                   </Card>
                 </Link>
+              </div>
               ))}
 
               <Card
@@ -318,9 +361,24 @@ export default function WorkflowsPage() {
                             className={`w-4 h-4 rounded`}
                             style={{ backgroundColor: workflow.color }}
                           />
-                          <Badge className="text-xs" variant="secondary">
-                            New
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge className="text-xs" variant="secondary">
+                              New
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setWorkflowToDelete(workflow);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="p-4 sm:p-6">
@@ -491,6 +549,29 @@ export default function WorkflowsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Workflow Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{workflowToDelete?.name}&rdquo;? This
+              action cannot be undone. All steps and objects linked to this
+              workflow will be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWorkflow}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
