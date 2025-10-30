@@ -10,14 +10,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
   Dialog,
   DialogHeader,
   DialogContent,
@@ -25,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkflows } from "@/lib/hooks/useWorkflows";
 import { projectService } from "@/lib/services";
@@ -114,52 +107,12 @@ export default function WorkflowsPage() {
   }
 
   if (!organization) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              No Organization Selected
-            </h2>
-            <p className="text-gray-600">
-              Please select or create an organization to manage workflows.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
+    return <NoOrganizationState />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={`/projects/${projectId}`}>{projectName}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Workflows</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

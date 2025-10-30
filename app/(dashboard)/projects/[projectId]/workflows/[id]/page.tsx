@@ -4,14 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -38,7 +30,7 @@ import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { OrganizationUserCombobox } from "@/components/people/organization-user-combobox";
 import { BackButton } from "@/components/ui/back-button";
-import Link from "next/link";
+import { getPriorityColor } from "@/components/objects/constants";
 import {
   DndContext,
   DragEndEvent,
@@ -233,21 +225,6 @@ function SortableObject({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  function getPriorityColor(priority: "low" | "medium" | "high" | "urgent"): string {
-    switch (priority) {
-      case "urgent":
-        return "bg-red-600";
-      case "high":
-        return "bg-red-500";
-      case "medium":
-        return "bg-yellow-500";
-      case "low":
-        return "bg-green-500";
-      default:
-        return "bg-yellow-500";
-    }
-  }
-
   const handleClick = () => {
     // Prevent navigation when dragging
     if (isDragging) return;
@@ -310,20 +287,6 @@ function SortableObject({
 }
 
 function ObjectOverlay({ object }: { object: ScadaObject }) {
-  function getPriorityColor(priority: "low" | "medium" | "high" | "urgent"): string {
-    switch (priority) {
-      case "urgent":
-        return "bg-red-600";
-      case "high":
-        return "bg-red-500";
-      case "medium":
-        return "bg-yellow-500";
-      case "low":
-        return "bg-green-500";
-      default:
-        return "bg-yellow-500";
-    }
-  }
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
       <CardContent className="p-3 sm:p-4">
@@ -854,38 +817,6 @@ export default function WorkflowPage() {
 
         {/* Workflow Content */}
         <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-          <Breadcrumb className="mb-4">
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href="/">Home</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href="/dashboard">Dashboard</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href={`/projects/${projectId}`}>Project</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href={`/projects/${projectId}/workflows`}>Workflows</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{workflow?.name ?? "Workflow"}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-
           <BackButton fallbackHref={`/projects/${projectId}/workflows`} className="mb-4" />
 
           {/* Stats */}

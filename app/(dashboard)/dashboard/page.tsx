@@ -4,14 +4,6 @@ import { ProjectCard } from "@/components/projects/project-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -20,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/lib/hooks/useProjects";
@@ -295,16 +288,7 @@ function ProjectsPageContent() {
   }
 
   if (!organization) {
-    return (
-      <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
-        <div className="mx-auto w-full max-w-6xl rounded-lg border bg-background p-8 text-center shadow-sm">
-          <h2 className="text-2xl font-semibold">No Organization Selected</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Please select or create an organization to manage projects.
-          </p>
-        </div>
-      </div>
-    );
+    return <NoOrganizationState />;
   }
 
   const hasProjects = filteredProjects.length > 0;
@@ -312,20 +296,6 @@ function ProjectsPageContent() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Dashboard</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="space-y-6">
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>

@@ -8,15 +8,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Input } from "@/components/ui/input";
+import { NoOrganizationState } from "@/components/ui/no-organization-state";
+import { PriorityBadge } from "@/components/ui/priority-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
@@ -121,20 +115,7 @@ export default function ObjectsPage() {
   }
 
   if (!organization) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              No Organization Selected
-            </h2>
-            <p className="text-gray-600">
-              Please select or create an organization to view objects.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
+    return <NoOrganizationState />;
   }
 
   if (error || !project) {
@@ -157,34 +138,7 @@ export default function ObjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={`/projects/${projectId}`}>{project.name}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Objects</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
@@ -283,7 +237,7 @@ export default function ObjectsPage() {
                           </p>
                         )}
                         <div className="mt-2">
-                          <BadgeByPriority priority={object.priority} />
+                          <PriorityBadge priority={object.priority} />
                         </div>
                       </div>
                     </div>
@@ -316,24 +270,5 @@ export default function ObjectsPage() {
         </Card>
       </main>
     </div>
-  );
-}
-
-type PriorityBadgeProps = {
-  priority: ScadaObject["priority"];
-};
-
-function BadgeByPriority({ priority }: PriorityBadgeProps) {
-  const styles: Record<ScadaObject["priority"], string> = {
-    low: "bg-green-100 text-green-700",
-    medium: "bg-blue-100 text-blue-700",
-    high: "bg-amber-100 text-amber-700",
-    urgent: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${styles[priority]}`}>
-      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-    </span>
   );
 }

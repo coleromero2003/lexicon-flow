@@ -9,20 +9,13 @@ import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -231,20 +224,7 @@ export default function LexiconPage() {
   }
 
   if (!organization) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">
-              No Organization Selected
-            </h2>
-            <p className="text-gray-600">
-              Please select or create an organization to manage your lexicon.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
+    return <NoOrganizationState />;
   }
 
   if (loading) {
@@ -266,28 +246,7 @@ export default function LexiconPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Lexicon</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="mb-6 sm:mb-8">
           <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
