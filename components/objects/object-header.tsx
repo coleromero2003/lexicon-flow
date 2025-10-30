@@ -86,11 +86,13 @@ export function ObjectHeader({
 
         {/* Meta Information Badges */}
         <div className="flex flex-wrap gap-2">
-          {object.assignee && (
+          {object.assignee && object.assignee.length > 0 && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <User className="h-3 w-3" />
-              {orgUsers.find((u) => u.userId === object.assignee)?.name ||
-                object.assignee}
+              {object.assignee.length === 1
+                ? orgUsers.find((u) => u.userId === object.assignee[0])?.name ||
+                  object.assignee[0]
+                : `${object.assignee.length} assignees`}
             </Badge>
           )}
           {object.due_date && (

@@ -66,7 +66,7 @@ export interface ScadaObject {
   step_id: number[] | null;
   title: string;
   description_md: string | null;
-  assignee: string | null;
+  assignee: string[]; // Array of user IDs for multiple assignees
   due_date: string | null;
   priority: ObjectPriority;
   sort_order: number;

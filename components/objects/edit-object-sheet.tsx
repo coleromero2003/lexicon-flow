@@ -34,14 +34,14 @@ interface EditObjectSheetProps {
   onOpenChange: (open: boolean) => void;
   initialValues: {
     title: string;
-    assignee: string;
+    assignee: string[];
     dueDate: Date | undefined;
     priority: string;
   };
   orgUsers: Array<{ userId: string; name: string }>;
   onSave: (values: {
     title: string;
-    assignee: string;
+    assignee: string[];
     dueDate: Date | undefined;
     priority: string;
   }) => Promise<void>;
@@ -84,19 +84,20 @@ export function EditObjectSheet({
           </div>
 
           <div className="space-y-2">
-            <Label>Assignee</Label>
+            <Label>Assignees</Label>
             <OrganizationUserCombobox
               users={orgUsers}
-              value={editForm.assignee ? editForm.assignee : null}
-              onChange={(userId) =>
+              value={editForm.assignee || []}
+              onChange={(userIds) =>
                 setEditForm({
                   ...editForm,
-                  assignee: userId ?? "",
+                  assignee: userIds,
                 })
               }
-              placeholder="Select assignee..."
+              multiple={true}
+              placeholder="Select assignees..."
               searchPlaceholder="Search users..."
-              emptyText="No user found."
+              emptyText="No users found."
             />
           </div>
 
