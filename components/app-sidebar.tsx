@@ -12,7 +12,6 @@ import {
   Network,
   FileText,
   BookOpen,
-  Settings,
   ClipboardList,
   CheckSquare,
   AlertCircle,
@@ -33,15 +32,11 @@ import {
   SidebarMenuBadge,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useState, useEffect, useCallback } from "react";
 import type { ScadaObject, ObjectSubtask, LexiconItem } from "@/lib/supabase/models";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 
 type ObjectWithProject = ScadaObject & {
   projects: {
@@ -141,7 +136,7 @@ export function AppSidebar() {
           high: 0,
           urgent: 0,
         };
-        allOrgObjects.forEach((obj: any) => {
+        (allOrgObjects as Pick<ScadaObject, "priority">[]).forEach((obj) => {
           if (obj.priority) {
             counts[obj.priority as keyof typeof counts]++;
           }
