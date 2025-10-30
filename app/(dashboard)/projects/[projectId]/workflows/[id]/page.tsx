@@ -1,6 +1,5 @@
 "use client";
 
-import Navbar from "@/components/navbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -725,20 +724,6 @@ export default function WorkflowPage() {
   return (
     <>
       <div className="min-h-screen bg-gray-50">
-        <Navbar
-          boardTitle={workflow?.name ?? undefined}
-          onEditBoard={() => {
-            setNewTitle(workflow?.name ?? "");
-            setNewColor(workflow?.color ?? "");
-            setIsEditingTitle(true);
-          }}
-          onFilterClick={() => setIsFilterOpen(true)}
-          filterCount={Object.values(filters).reduce(
-            (count, v) =>
-              count + (Array.isArray(v) ? v.length : v !== null ? 1 : 0),
-            0
-          )}
-        />
 
         <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
           <DialogContent className="w-[95vw] max-w-[425px] mx-auto">

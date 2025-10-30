@@ -8,7 +8,6 @@ import { BookOpen, Filter, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -234,7 +233,6 @@ export default function LexiconPage() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <div className="text-center">
             <h2 className="mb-4 text-2xl font-bold text-gray-900">
@@ -252,7 +250,6 @@ export default function LexiconPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto space-y-6 px-4 py-6 sm:py-8">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-full max-w-md" />
@@ -269,7 +266,6 @@ export default function LexiconPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
         <Breadcrumb className="mb-4">

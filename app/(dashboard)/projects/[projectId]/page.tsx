@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useOrganization } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -24,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
 import { FileMeta, Project, ScadaObject, Workflow } from "@/lib/supabase/models";
+import { formatFileSize } from "@/lib/utils/format-file-size";
 import {
   FolderKanban,
   LayoutDashboard,
@@ -131,7 +131,6 @@ export default function ProjectDashboardPage() {
   function renderLoadingState() {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-full max-w-md" />
@@ -154,7 +153,6 @@ export default function ProjectDashboardPage() {
   if (!organization) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="No organization selected"
@@ -168,7 +166,6 @@ export default function ProjectDashboardPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="Unable to load project dashboard"
@@ -187,7 +184,6 @@ export default function ProjectDashboardPage() {
   if (!project) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <EmptyState
             title="Project not found"
@@ -200,7 +196,6 @@ export default function ProjectDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <main className="container mx-auto px-4 py-6 sm:py-8 space-y-8">
         <Breadcrumb>
           <BreadcrumbList>
@@ -497,19 +492,3 @@ function BadgeByPriority({ priority }: PriorityBadgeProps) {
   );
 }
 
-function formatFileSize(sizeBytes: FileMeta["size_bytes"]) {
-  if (!sizeBytes || sizeBytes <= 0) {
-    return "Unknown size";
-  }
-
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let size = sizeBytes;
-  let unitIndex = 0;
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-
-  return `${size.toFixed(size < 10 && unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
-}

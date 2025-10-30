@@ -7,7 +7,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 
-import Navbar from "@/components/navbar";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
 import { BackButton } from "@/components/ui/back-button";
@@ -505,7 +504,6 @@ export default function ObjectPage() {
   if (loading || subtasksHook.loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar boardTitle="Loading..." />
         <main className="container mx-auto px-4 py-6 sm:py-8">
           <Skeleton className="h-10 w-32 mb-4" />
           <div className="mb-6 sm:mb-8">
@@ -525,7 +523,6 @@ export default function ObjectPage() {
   if (error || !object) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar boardTitle="Error" />
         <div className="flex items-center justify-center h-[calc(100vh-64px)]">
           <EmptyState
             icon={<FileText className="h-12 w-12" />}
@@ -547,7 +544,6 @@ export default function ObjectPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar boardTitle={object.title} />
 
       <input
         ref={fileInputRef}

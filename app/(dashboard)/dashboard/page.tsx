@@ -1,6 +1,5 @@
 "use client";
 
-import Navbar from "@/components/navbar";
 import { ProjectCard } from "@/components/projects/project-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -83,19 +81,16 @@ const sanitizeProjectCode = (value: string) => sanitizePlainText(value);
 
 function DashboardErrorFallback() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <main className="container mx-auto px-4 py-12">
-        <EmptyState
-          title="Something went wrong"
-          description="We couldn't render your projects. Please refresh and try again."
-          action={
-            <Button onClick={() => window.location.reload()}>
-              Reload page
-            </Button>
-          }
-        />
-      </main>
+    <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
+      <div className="mx-auto w-full max-w-6xl rounded-lg border bg-background p-8 text-center shadow-sm">
+        <h2 className="text-2xl font-semibold">Something went wrong</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          We couldn&apos;t render your projects. Please refresh and try again.
+        </p>
+        <Button className="mt-4" onClick={() => window.location.reload()}>
+          Reload page
+        </Button>
+      </div>
     </div>
   );
 }
@@ -209,7 +204,7 @@ function ProjectsPageContent() {
 
   if (!userLoaded) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center p-6">
         <LoadingSpinner label="Loading your account..." />
       </div>
     );
@@ -283,37 +278,31 @@ function ProjectsPageContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="container mx-auto px-4 py-12">
-          <EmptyState
-            title="Unable to load projects"
-            description={error}
-            action={
-              <Button onClick={() => void reload()} variant="outline">
-                Retry loading projects
-              </Button>
-            }
-          />
-        </main>
+      <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
+        <div className="mx-auto w-full max-w-6xl rounded-lg border bg-background p-8 text-center shadow-sm">
+          <h2 className="text-2xl font-semibold">Unable to load projects</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+          <Button
+            className="mt-4"
+            onClick={() => void reload()}
+            variant="outline"
+          >
+            Retry loading projects
+          </Button>
+        </div>
       </div>
     );
   }
 
   if (!organization) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              No Organization Selected
-            </h2>
-            <p className="text-gray-600">
-              Please select or create an organization to manage projects.
-            </p>
-          </div>
-        </main>
+      <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
+        <div className="mx-auto w-full max-w-6xl rounded-lg border bg-background p-8 text-center shadow-sm">
+          <h2 className="text-2xl font-semibold">No Organization Selected</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Please select or create an organization to manage projects.
+          </p>
+        </div>
       </div>
     );
   }
@@ -321,10 +310,8 @@ function ProjectsPageContent() {
   const hasProjects = filteredProjects.length > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <main className="container mx-auto px-4 py-6 sm:py-8">
+    <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
         <Breadcrumb className="mb-4">
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -339,7 +326,7 @@ function ProjectsPageContent() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="mb-6 sm:mb-8">
+        <div className="space-y-6">
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">
@@ -358,7 +345,7 @@ function ProjectsPageContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
           <Card>
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -438,7 +425,7 @@ function ProjectsPageContent() {
 
         {/* User Assignments Section */}
         {!loadingUserData && (assignedObjects.length > 0 || assignedTasks.length > 0) && (
-          <div className="mb-6 sm:mb-8 space-y-6">
+          <div className="space-y-6">
             {/* Assigned Objects */}
             {assignedObjects.length > 0 && (
               <Card>
@@ -514,7 +501,7 @@ function ProjectsPageContent() {
                       return (
                         <div
                           key={task.id}
-                          className="flex items-start justify-between rounded-lg border border-gray-200 p-3 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                          className="flex items-start justify-between rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-300 hover:bg-blue-50"
                         >
                           <div className="flex-1">
                             <p className="text-sm font-medium text-gray-900">
@@ -551,7 +538,7 @@ function ProjectsPageContent() {
           </div>
         )}
 
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
@@ -675,7 +662,7 @@ function ProjectsPageContent() {
             </Card>
           </div>
         )}
-      </main>
+      </div>
 
       <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
         <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
