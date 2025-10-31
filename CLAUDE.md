@@ -42,13 +42,6 @@ npm run test:e2e:debug   # Debug E2E tests
 npm run test:e2e:report  # View last test report
 ```
 
-### Local Supabase
-```bash
-supabase start       # Start local Supabase instance
-supabase db push     # Push migrations to local database
-supabase stop        # Stop local Supabase instance
-```
-
 ## Architecture
 
 ### Directory Structure
@@ -75,8 +68,6 @@ supabase stop        # Stop local Supabase instance
   - `ui/` - shadcn/ui components (button, dialog, input, etc.)
   - `navbar.tsx` - Navigation bar component
   - `cookie-notice.tsx` - GDPR cookie consent component
-
-- **`supabase/migrations/`** - Database migrations
 
 - **`docs/`** - Documentation
   - `SENTRY.md` - Comprehensive Sentry monitoring documentation
@@ -144,10 +135,6 @@ Required environment variables (see `.env` example in README):
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
 - `CLERK_SECRET_KEY` - Clerk secret key
 
-For testing (`.env.test`):
-- `SUPABASE_URL` - Local Supabase URL (default: http://127.0.0.1:54321)
-- `SUPABASE_ANON_KEY` - Local Supabase anon key
-
 For Sentry (optional in `.env`):
 - `SENTRY_ENABLED` - Enable Sentry in development (disabled by default)
 
@@ -162,18 +149,15 @@ For Sentry (optional in `.env`):
 Tests use Vitest with jsdom environment. Run local Supabase instance before running tests.
 
 **E2E Tests** are located in `e2e/`:
-- `global-setup.ts` - Clerk authentication setup (runs once before all tests)
-- `helpers.ts` - Test utilities (navigation, actions, assertions)
+- `global.setup.ts` - Clerk authentication setup (runs once before all tests)
 - `dashboard.spec.ts` - Dashboard navigation and UI tests
 - `projects.spec.ts` - Project CRUD operations
 - `objects.spec.ts` - SCADA object management tests
 - `workflows.spec.ts` - Workflow and step management tests
 
-E2E tests use Playwright with Clerk testing utilities for authentication bypass. Set `PLAYWRIGHT_TEST_EMAIL` and `PLAYWRIGHT_TEST_PASSWORD` in `.env.local` with credentials for a test user in your Clerk instance. See [docs/PLAYWRIGHT.md](docs/PLAYWRIGHT.md) for comprehensive E2E testing documentation.
+E2E tests use Playwright with Clerk testing utilities for authentication bypass. Set `E2E_CLERK_USER_USERNAME` and `E2E_CLERK_USER_PASSWORD` in `.env` with credentials for a test user in your Clerk instance.
 
 ## Database Schema Notes
-
-The database includes a local RLS disable migration (`99999999999999_local_disable_rls.sql`) for local development. This should NOT be used in production.
 
 The main schema includes:
 
@@ -226,20 +210,6 @@ Provides direct database access and management tools:
 - `generate_typescript_types` - Generate TypeScript types from database schema
 - Edge Functions: `list_edge_functions`, `get_edge_function`, `deploy_edge_function`
 - Branching: `create_branch`, `list_branches`, `delete_branch`, `merge_branch`, `reset_branch`, `rebase_branch`
-
-### Vercel MCP Server
-Provides deployment and project management tools:
-- `search_vercel_documentation` - Search Vercel docs
-- `deploy_to_vercel` - Deploy the project
-- `list_projects` - View all Vercel projects
-- `get_project` - Get project details
-- `list_deployments` - View deployment history
-- `get_deployment` - Get deployment details
-- `get_deployment_build_logs` - View build logs for debugging
-- `get_access_to_vercel_url` - Generate shareable links for protected deployments
-- `web_fetch_vercel_url` - Fetch deployment URLs with authentication
-- `list_teams` - View team information
-- `check_domain_availability_and_price` - Domain management
 
 **Usage Tips:**
 - Use `get_advisors` regularly after schema changes to check for missing RLS policies

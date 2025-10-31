@@ -265,7 +265,7 @@ export default function ProjectDashboardPage() {
                 A snapshot of the workflows in this project. Use the dropdown to explore the rest.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/workflows`)}>
+            <Button data-testid="create-workflow-btn" variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/workflows`)}>
               Manage workflows
             </Button>
           </CardHeader>
@@ -279,7 +279,7 @@ export default function ProjectDashboardPage() {
                       href={`/projects/${projectId}/workflows/${workflow.id}`}
                       className="flex-1 min-w-[200px]"
                     >
-                      <div className="h-full rounded-lg border bg-white p-4 shadow-sm transition hover:border-blue-400 hover:shadow">
+                      <div data-testid="workflow-item" className="h-full rounded-lg border bg-white p-4 shadow-sm transition hover:border-blue-400 hover:shadow">
                         <div className="flex items-center justify-between">
                           <h3 className="text-base font-semibold text-gray-900">{workflow.name}</h3>
                           <span
@@ -352,7 +352,7 @@ export default function ProjectDashboardPage() {
                 Key SCADA objects that belong to this project.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/objects`)}>
+            <Button data-testid="create-object-btn" variant="outline" size="sm" onClick={() => router.push(`/projects/${projectId}/objects`)}>
               Manage objects
             </Button>
           </CardHeader>

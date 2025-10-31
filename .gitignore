@@ -58,3 +58,6 @@ sentry.properties
 /playwright/.cache/
 /e2e/.auth/
 /e2e/.clerk/
+/e2e/screenshots/
+playwright-report/
+test-results/

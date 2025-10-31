@@ -20,7 +20,11 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: "html",
+  reporter: [
+    ["html", { outputFolder: "playwright-report" }],
+    ["json", { outputFile: "playwright-report/results.json" }],
+    ["list"], // Console output
+  ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -34,6 +38,29 @@ export default defineConfig({
 
     /* Video on retry */
     video: "retain-on-failure",
+
+    /* Maximum time each action can take */
+    actionTimeout: 15000,
+
+    /* Maximum time for navigation */
+    navigationTimeout: 30000,
+
+    /* Emulate user interactions */
+    hasTouch: false,
+
+    /* Viewport size */
+    viewport: { width: 1280, height: 720 },
+
+    /* Accept downloads during tests */
+    acceptDownloads: true,
+  },
+
+  /* Timeout for each test */
+  timeout: 60000,
+
+  /* Expect timeout for assertions */
+  expect: {
+    timeout: 10000,
   },
 
   /* Configure projects for major browsers */
@@ -49,6 +76,16 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
       },
       dependencies: ["global setup"],
+      testMatch: /.*\.spec\.ts/,
+    },
+
+    {
+      name: "chromium-enhanced",
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+      dependencies: ["global setup"],
+      testMatch: /.*\.enhanced\.spec\.ts/,
     },
 
     /* Test against mobile viewports. */
@@ -58,7 +95,24 @@ export default defineConfig({
         ...devices["iPhone 12"],
       },
       dependencies: ["global setup"],
+      testMatch: /.*\.(spec|enhanced\.spec)\.ts/,
     },
+
+    /* Additional browsers (uncomment to enable) */
+    // {
+    //   name: "firefox",
+    //   use: {
+    //     ...devices["Desktop Firefox"],
+    //   },
+    //   dependencies: ["global setup"],
+    // },
+    // {
+    //   name: "webkit",
+    //   use: {
+    //     ...devices["Desktop Safari"],
+    //   },
+    //   dependencies: ["global setup"],
+    // },
 
     /* Test against branded browsers. */
     // {

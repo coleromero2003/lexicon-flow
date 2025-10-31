@@ -149,6 +149,7 @@ export function SubtasksCard({
         </div>
         {!isAddingSubtask && (
           <Button
+            data-testid="add-subtask-btn"
             size="sm"
             variant="outline"
             onClick={() => setIsAddingSubtask(true)}
