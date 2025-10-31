@@ -11,7 +11,8 @@ Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition)
 - Supabase for database, authentication, and storage
 - Clerk for advanced authentication and organization management
 - Sentry for error monitoring and performance tracking
-- Vitest for testing
+- Vitest for unit/integration testing
+- Playwright for E2E testing with Clerk authentication
 - TailwindCSS 4 for styling
 - Shadcn UI components for unified design
 
@@ -27,10 +28,18 @@ npm run lint         # Run ESLint
 
 ### Testing
 ```bash
+# Unit/Integration Tests (Vitest)
 npm test             # Run tests in watch mode
 npm run test:ui      # Run tests with Vitest UI
 npm run test:run     # Run tests once (CI mode)
 npm run test:coverage # Run tests with coverage report
+
+# E2E Tests (Playwright)
+npm run test:e2e         # Run E2E tests (headless)
+npm run test:e2e:ui      # Run E2E tests with UI mode
+npm run test:e2e:headed  # Run E2E tests in headed mode
+npm run test:e2e:debug   # Debug E2E tests
+npm run test:e2e:report  # View last test report
 ```
 
 ### Local Supabase
@@ -144,13 +153,23 @@ For Sentry (optional in `.env`):
 
 ## Testing Strategy
 
-Tests are located in `lib/__tests__/`:
+**Unit/Integration Tests** are located in `lib/__tests__/`:
 - `setup.ts` - Global test setup and helper to create test Supabase client
 - `helpers.ts` - Test utilities
 - `services.test.ts` - Service layer tests
 - `example.test.ts` - Example test patterns
 
 Tests use Vitest with jsdom environment. Run local Supabase instance before running tests.
+
+**E2E Tests** are located in `e2e/`:
+- `global-setup.ts` - Clerk authentication setup (runs once before all tests)
+- `helpers.ts` - Test utilities (navigation, actions, assertions)
+- `dashboard.spec.ts` - Dashboard navigation and UI tests
+- `projects.spec.ts` - Project CRUD operations
+- `objects.spec.ts` - SCADA object management tests
+- `workflows.spec.ts` - Workflow and step management tests
+
+E2E tests use Playwright with Clerk testing utilities for authentication bypass. Set `PLAYWRIGHT_TEST_EMAIL` and `PLAYWRIGHT_TEST_PASSWORD` in `.env.local` with credentials for a test user in your Clerk instance. See [docs/PLAYWRIGHT.md](docs/PLAYWRIGHT.md) for comprehensive E2E testing documentation.
 
 ## Database Schema Notes
 
