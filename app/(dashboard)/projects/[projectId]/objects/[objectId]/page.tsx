@@ -457,7 +457,7 @@ export default function ObjectPage() {
     try {
       // Add the workflow and step IDs to the object's arrays
       const currentWorkflowIds = object.workflow_id || [];
-      const currentStepIds = object.step_id || [];
+      const currentStepIds = object.step_id ? [...object.step_id] : [];
 
       await updateObject({
         workflow_id: [...currentWorkflowIds, workflowId],
@@ -472,6 +472,34 @@ export default function ObjectPage() {
     }
   };
 
+  const handleRemoveStep = async (workflowId: number) => {
+    if (!object || !supabase) return;
+
+    try {
+      const workflowIds = object.workflow_id || [];
+      const workflowIndex = workflowIds.indexOf(workflowId);
+      if (workflowIndex === -1) return;
+
+      const currentStepIds = object.step_id ? [...object.step_id] : [];
+
+      while (currentStepIds.length < workflowIds.length) {
+        currentStepIds.push(null);
+      }
+
+      currentStepIds[workflowIndex] = null;
+
+      await updateObject({
+        step_id: currentStepIds,
+      });
+
+      toast.success("Step removed from object");
+    } catch (err) {
+      console.error("Failed to remove step from object", err);
+      toast.error("Failed to remove step from object");
+      throw err;
+    }
+  };
+
   const handleRemoveWorkflow = async (workflowId: number) => {
     if (!object || !supabase) return;
 
@@ -482,7 +510,7 @@ export default function ObjectPage() {
 
       // Remove the workflow and its corresponding step
       const newWorkflowIds = [...(object.workflow_id || [])];
-      const newStepIds = [...(object.step_id || [])];
+      const newStepIds = object.step_id ? [...object.step_id] : [];
 
       newWorkflowIds.splice(workflowIndex, 1);
       newStepIds.splice(workflowIndex, 1);
@@ -605,6 +633,7 @@ export default function ObjectPage() {
               projectId={parsedProjectId}
               onAddWorkflow={handleAddWorkflow}
               onRemoveWorkflow={handleRemoveWorkflow}
+              onRemoveStep={handleRemoveStep}
               loading={isLoadingWorkflows}
             />
 

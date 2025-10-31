@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Workflow, Plus, X } from "lucide-react";
+import { Workflow, Plus, Trash2, X } from "lucide-react";
 import { Workflow as WorkflowType, Step } from "@/lib/supabase/models";
 
 interface WorkflowInfo {
@@ -52,6 +52,7 @@ interface WorkflowsCardProps {
   projectId: number;
   onAddWorkflow: (workflowId: number, stepId: number) => Promise<void>;
   onRemoveWorkflow: (workflowId: number) => Promise<void>;
+  onRemoveStep: (workflowId: number) => Promise<void>;
   loading?: boolean;
 }
 
@@ -61,6 +62,7 @@ export function WorkflowsCard({
   projectId,
   onAddWorkflow,
   onRemoveWorkflow,
+  onRemoveStep,
 }: WorkflowsCardProps) {
   const { supabase } = useSupabase();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -72,6 +74,9 @@ export function WorkflowsCard({
   const [removingWorkflowId, setRemovingWorkflowId] = useState<number | null>(
     null
   );
+  const [removingStepWorkflowId, setRemovingStepWorkflowId] = useState<
+    number | null
+  >(null);
 
   const assignedWorkflowIds = workflows.map((w) => w.workflow.id);
   const unassignedWorkflows = availableWorkflows.filter(
@@ -130,6 +135,17 @@ export function WorkflowsCard({
       console.error("Failed to remove workflow:", error);
     } finally {
       setRemovingWorkflowId(null);
+    }
+  };
+
+  const handleRemoveStep = async (workflowId: number) => {
+    try {
+      setRemovingStepWorkflowId(workflowId);
+      await onRemoveStep(workflowId);
+    } catch (error) {
+      console.error("Failed to remove step:", error);
+    } finally {
+      setRemovingStepWorkflowId(null);
     }
   };
   return (
@@ -269,9 +285,24 @@ export function WorkflowsCard({
                 </Link>
                 <div className="flex items-center gap-2">
                   {step && (
-                    <Badge variant="outline" className="text-xs">
-                      {step.title}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="text-xs">
+                        {step.title}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-600"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          void handleRemoveStep(workflow.id);
+                        }}
+                        disabled={removingStepWorkflowId === workflow.id}
+                        aria-label="Remove step"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                   <Button
                     variant="ghost"

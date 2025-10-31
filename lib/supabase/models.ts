@@ -63,7 +63,7 @@ export interface ScadaObject {
   updated_at: string;
   project_id: number;
   workflow_id: number[] | null;
-  step_id: number[] | null;
+  step_id: Array<number | null> | null;
   title: string;
   description_md: string | null;
   assignee: string[]; // Array of user IDs for multiple assignees
