@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Flag,
   User,
@@ -27,7 +26,6 @@ interface ObjectHeaderProps {
   orgUsers: Array<{ userId: string; name: string }>;
   onEdit: () => void;
   onDelete?: () => void;
-  onBack: () => void;
 }
 
 export function ObjectHeader({
@@ -35,16 +33,9 @@ export function ObjectHeader({
   orgUsers,
   onEdit,
   onDelete,
-  onBack,
 }: ObjectHeaderProps) {
   return (
     <>
-      {/* Back Button */}
-      <Button variant="ghost" className="mb-4" onClick={onBack}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Workflow
-      </Button>
-
       {/* Header Section */}
       <div className="mb-6 sm:mb-8">
         <div className="flex items-start justify-between mb-4">

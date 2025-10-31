@@ -8,7 +8,6 @@ import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
-import { BackButton } from "@/components/ui/back-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -552,7 +551,6 @@ export default function ObjectPage() {
       />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <BackButton fallbackHref={`/projects/${projectId}/objects`} className="mb-4" />
 
         <ObjectHeader
           object={object}
@@ -561,7 +559,6 @@ export default function ObjectPage() {
             name,
           }))}
           onEdit={handleOpenEditSheet}
-          onBack={() => router.push(`/projects/${projectId}/objects`)}
         />
 
         {/* PDF Generation Actions */}

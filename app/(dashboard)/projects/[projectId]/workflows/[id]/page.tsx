@@ -686,7 +686,7 @@ export default function WorkflowPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 ">
 
         <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
           <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
@@ -818,6 +818,9 @@ export default function WorkflowPage() {
         {/* Workflow Content */}
         <main className="w-full max-w-full px-2 sm:px-4 py-4 sm:py-6">
           <BackButton fallbackHref={`/projects/${projectId}/workflows`} className="mb-4" />
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                {workflow ? `Steps for ${workflow.name}` : 'Steps for an unassigned workflow'}
+              </h1>
 
           {/* Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 space-y-4 sm:space-y-0">
