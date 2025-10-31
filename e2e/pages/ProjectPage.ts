@@ -55,7 +55,7 @@ export class ProjectPage extends BasePage {
    * Get all object items
    */
   getObjects(): Locator {
-    return this.page.locator('[data-testid="object-item"], [data-testid*="object-"]');
+    return this.page.locator('[data-testid="object-item"]');
   }
 
   /**

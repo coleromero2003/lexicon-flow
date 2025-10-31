@@ -19,7 +19,9 @@ async function cleanupTestData() {
   );
 
   try {
-    // Delete all test projects (cascades to workflows, objects, etc.)
+    console.log('🧹 Starting cleanup of test data...\n');
+
+    // Delete all test projects (cascades to workflows, steps, and objects due to FK constraints)
     const { data: deletedProjects, error: projectError } = await supabase
       .from('projects')
       .delete()
@@ -31,35 +33,41 @@ async function cleanupTestData() {
       throw projectError;
     }
 
-    console.log('✅ Cleaned up test projects:', deletedProjects?.length || 0);
+    const projectCount = deletedProjects?.length || 0;
+    console.log(`✅ Cleaned up ${projectCount} test project(s)`);
 
-    // Delete test workflows (in case they weren't cascaded)
-    const { data: deletedWorkflows, error: workflowError } = await supabase
+    if (projectCount > 0) {
+      console.log('   (Related workflows, steps, and objects were automatically deleted via CASCADE)');
+    }
+
+    // Verify cleanup by checking for orphaned test data
+    const { data: orphanedWorkflows } = await supabase
       .from('workflows')
-      .delete()
-      .ilike('name', '%E2E Test%')
-      .select();
+      .select('id')
+      .ilike('name', '%E2E Test%');
 
-    if (workflowError && workflowError.code !== 'PGRST116') {
-      console.error('Error cleaning up workflows:', workflowError);
-    } else {
-      console.log('✅ Cleaned up test workflows:', deletedWorkflows?.length || 0);
-    }
-
-    // Delete test objects (in case they weren't cascaded)
-    const { data: deletedObjects, error: objectError } = await supabase
+    const { data: orphanedObjects } = await supabase
       .from('objects')
-      .delete()
-      .ilike('title', '%Test %')
-      .select();
+      .select('id')
+      .ilike('title', '%Test %');
 
-    if (objectError && objectError.code !== 'PGRST116') {
-      console.error('Error cleaning up objects:', objectError);
-    } else {
-      console.log('✅ Cleaned up test objects:', deletedObjects?.length || 0);
+    if (orphanedWorkflows && orphanedWorkflows.length > 0) {
+      console.warn(`⚠️  Found ${orphanedWorkflows.length} orphaned test workflows - cleaning up...`);
+      await supabase
+        .from('workflows')
+        .delete()
+        .ilike('name', '%E2E Test%');
     }
 
-    console.log('\n🎉 Test data cleaned up successfully!');
+    if (orphanedObjects && orphanedObjects.length > 0) {
+      console.warn(`⚠️  Found ${orphanedObjects.length} orphaned test objects - cleaning up...`);
+      await supabase
+        .from('objects')
+        .delete()
+        .ilike('title', '%Test %');
+    }
+
+    console.log('\n🎉 Test data cleanup completed successfully!');
 
   } catch (err) {
     console.error('❌ Failed to cleanup test data:', err);

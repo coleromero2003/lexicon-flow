@@ -26,11 +26,21 @@ async function seedTestData() {
   }
 
   try {
-    // Create test project
+    // First, cleanup any existing test data to avoid unique constraint violations
+    console.log('🧹 Cleaning up existing test data...');
+    await supabase
+      .from('projects')
+      .delete()
+      .ilike('name', '%E2E Test%');
+
+    console.log('✅ Cleanup complete\n');
+
+    // Create test project with timestamp to ensure uniqueness
+    const timestamp = new Date().toISOString().split('T')[0];
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert({
-        name: 'E2E Test Project',
+        name: `E2E Test Project ${timestamp}`,
         description: 'Project for E2E testing',
         org_id: orgId,
         status: 'active',

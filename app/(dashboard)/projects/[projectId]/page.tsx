@@ -363,6 +363,7 @@ export default function ProjectDashboardPage() {
                   <Link
                     key={object.id}
                     href={`/projects/${projectId}/objects/${object.id}`}
+                    data-testid="object-item"
                     className="block rounded-lg border bg-white p-4 shadow-sm transition hover:border-emerald-400 hover:shadow"
                   >
                     <div className="flex items-start justify-between gap-4">

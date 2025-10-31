@@ -61,3 +61,4 @@ sentry.properties
 /e2e/screenshots/
 playwright-report/
 test-results/
+backup-data/
