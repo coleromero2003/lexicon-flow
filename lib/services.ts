@@ -389,6 +389,10 @@ export const objectService = {
     // First, get the current object to access its workflow_id and step_id arrays
     const currentObject = await this.getObject(supabase, objectId);
 
+    if (!currentObject) {
+      throw new Error("Object not found");
+    }
+
     // Add the new workflow and step IDs to the arrays (if not already present)
     const workflowIds = currentObject.workflow_id || [];
     const stepIds = currentObject.step_id || [];
