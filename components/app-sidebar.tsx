@@ -81,10 +81,12 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
+      <SidebarSeparator />
+
       <SidebarContent>
         {/* Dashboard access */}
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupLabel>Hub</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -133,17 +135,11 @@ export function AppSidebar() {
                   <span>Forward</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Return to Dashboard">
-                  <Link href="/dashboard">
-                    <FolderKanban />
-                    <span>Go to Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarSeparator />
 
         {selectedProject && (
           <>
