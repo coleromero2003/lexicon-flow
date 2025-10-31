@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import Navbar from "@/components/navbar";
 import { ProjectCard } from "@/components/projects/project-card";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -88,7 +87,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <main className="container mx-auto px-4 py-10">
         <div className="mx-auto flex max-w-6xl flex-col gap-8">
           <header className="flex flex-col gap-2 text-center sm:text-left">
