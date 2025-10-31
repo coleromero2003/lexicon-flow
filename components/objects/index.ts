@@ -8,5 +8,6 @@ export { PropertiesCard } from "./properties-card";
 export { ConnectionsCard } from "./connections-card";
 export { LexiconCard } from "./lexicon-card";
 export { LinkObjectDialog } from "./link-object-dialog";
+export { LinkLexiconDialog } from "./link-lexicon-dialog";
 export { PRIORITIES, RELATION_KIND_OPTIONS, getPriorityColor } from "./constants";
 export type { PriorityValue } from "./constants";
