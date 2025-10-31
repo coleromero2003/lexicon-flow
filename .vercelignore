@@ -3,3 +3,5 @@
 **/*.test.*
 **/*.spec.*
 vitest.config.ts
+e2e/
+playwright.config.ts

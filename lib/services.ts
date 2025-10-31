@@ -42,13 +42,19 @@ export const projectService = {
     return data || [];
   },
 
-  async getProjectById(supabase: SupabaseClient, id: number): Promise<Project> {
+  async getProjectById(supabase: SupabaseClient, id: number): Promise<Project | null> {
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .eq("id", id)
       .single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found error
+        return null;
+      }
+      throw error;
+    }
     return data;
   },
 
@@ -99,13 +105,19 @@ export const workflowService = {
   async getWorkflow(
     supabase: SupabaseClient,
     workflowId: number
-  ): Promise<Workflow> {
+  ): Promise<Workflow | null> {
     const { data, error } = await supabase
       .from("workflows")
       .select("*")
       .eq("id", workflowId)
       .single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found error
+        return null;
+      }
+      throw error;
+    }
     return data;
   },
 
@@ -254,13 +266,19 @@ export const objectService = {
   async getObject(
     supabase: SupabaseClient,
     objectId: number
-  ): Promise<ScadaObject> {
+  ): Promise<ScadaObject | null> {
     const { data, error } = await supabase
       .from("objects")
       .select("*")
       .eq("id", objectId)
       .single();
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found error
+        return null;
+      }
+      throw error;
+    }
     return data;
   },
 
@@ -370,6 +388,10 @@ export const objectService = {
   ): Promise<ScadaObject> {
     // First, get the current object to access its workflow_id and step_id arrays
     const currentObject = await this.getObject(supabase, objectId);
+
+    if (!currentObject) {
+      throw new Error("Object not found");
+    }
 
     // Add the new workflow and step IDs to the arrays (if not already present)
     const workflowIds = currentObject.workflow_id || [];

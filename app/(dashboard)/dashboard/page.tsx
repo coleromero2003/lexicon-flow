@@ -512,6 +512,7 @@ function ProjectsPageContent() {
           <div className="relative w-full lg:max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
+              data-testid="project-search-input"
               placeholder="Search projects..."
               className="pl-10"
               value={filters.search}
@@ -545,7 +546,7 @@ function ProjectsPageContent() {
             >
               <Filter className="mr-2 h-4 w-4" /> Filters
             </Button>
-            <Button size="sm" onClick={() => setIsCreatingProject(true)}>
+            <Button data-testid="create-project-btn" size="sm" onClick={() => setIsCreatingProject(true)}>
               <Plus className="mr-2 h-4 w-4" /> New project
             </Button>
           </div>

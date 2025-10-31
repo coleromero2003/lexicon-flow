@@ -16,7 +16,7 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
 
   return (
     <Link href={`/projects/${project.id}`} className="block">
-      <Card className={cn("group cursor-pointer transition-shadow hover:shadow-lg", className)}>
+      <Card data-testid="project-card" className={cn("group cursor-pointer transition-shadow hover:shadow-lg", className)}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="h-4 w-4 rounded bg-blue-500" />

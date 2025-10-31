@@ -45,7 +45,7 @@ export function ConnectionsCard({
           </CardTitle>
           <CardDescription>Related objects</CardDescription>
         </div>
-        <Button size="sm" variant="outline" onClick={onAdd}>
+        <Button data-testid="add-relationship-btn" size="sm" variant="outline" onClick={onAdd}>
           <Plus className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -60,6 +60,7 @@ export function ConnectionsCard({
           <div className="space-y-2">
             {relations.map(({ relation, relatedObject }) => (
               <div
+                data-testid="relationship-item"
                 key={relation.id}
                 onClick={() => onNavigate(relatedObject.id)}
                 className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer group"

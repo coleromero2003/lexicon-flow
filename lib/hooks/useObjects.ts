@@ -68,10 +68,17 @@ export function useObject(objectId: number) {
       // Get the base object
       const baseObject = await objectService.getObject(supabase, objectId);
 
+      if (!baseObject) {
+        throw new Error("Object not found");
+      }
+
       // Get workflows and steps
       const workflowsWithSteps = await Promise.all(
         (baseObject.workflow_id || []).map(async (wfId, index) => {
           const workflow = await workflowService.getWorkflow(supabase, wfId);
+          if (!workflow) {
+            throw new Error(`Workflow ${wfId} not found`);
+          }
           const stepId = baseObject.step_id?.[index];
           let step = null;
           if (stepId) {
@@ -88,22 +95,26 @@ export function useObject(objectId: number) {
       );
 
       // For each relation, get the related object details
-      const relationsWithObjects = await Promise.all(
-        relations.map(async (relation) => {
-          const relatedObjectId =
-            relation.src_object_id === objectId
-              ? relation.dst_object_id
-              : relation.src_object_id;
-          const relatedObject = await objectService.getObject(
-            supabase,
-            relatedObjectId
-          );
-          return {
-            relation,
-            relatedObject,
-          };
-        })
-      );
+      const relationsWithObjects = (
+        await Promise.all(
+          relations.map(async (relation) => {
+            const relatedObjectId =
+              relation.src_object_id === objectId
+                ? relation.dst_object_id
+                : relation.src_object_id;
+            const relatedObject = await objectService.getObject(
+              supabase,
+              relatedObjectId
+            );
+            return relatedObject
+              ? {
+                  relation,
+                  relatedObject,
+                }
+              : null;
+          })
+        )
+      ).filter((item): item is { relation: ObjectRelation; relatedObject: ScadaObject } => item !== null);
 
       // Get subtasks
       const subtasks = await objectSubtaskService.getSubtasksByObject(
@@ -116,27 +127,33 @@ export function useObject(objectId: number) {
         supabase,
         objectId
       );
-      const files = await Promise.all(
-        fileLinks.map((link) => fileService.getFile(supabase, link.file_id))
-      );
+      const files = (
+        await Promise.all(
+          fileLinks.map((link) => fileService.getFile(supabase, link.file_id))
+        )
+      ).filter((file): file is FileMeta => file !== null);
 
       // Get lexicon links
       const lexiconLinks = await objectLexiconService.getLexiconByObject(
         supabase,
         objectId
       );
-      const lexiconLinksWithItems = await Promise.all(
-        lexiconLinks.map(async (link) => {
-          const lexiconItem = await lexiconService.getLexiconItem(
-            supabase,
-            link.lexicon_id
-          );
-          return {
-            link,
-            lexiconItem,
-          };
-        })
-      );
+      const lexiconLinksWithItems = (
+        await Promise.all(
+          lexiconLinks.map(async (link) => {
+            const lexiconItem = await lexiconService.getLexiconItem(
+              supabase,
+              link.lexicon_id
+            );
+            return lexiconItem
+              ? {
+                  link,
+                  lexiconItem,
+                }
+              : null;
+          })
+        )
+      ).filter((item): item is { link: ObjectLexiconLink; lexiconItem: LexiconItem } => item !== null);
 
       // Combine all data
       const objectWithDetails: ObjectWithAllDetails = {
