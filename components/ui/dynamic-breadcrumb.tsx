@@ -72,7 +72,7 @@ export function DynamicBreadcrumb() {
             supabase,
             Number(extractedIds.projectId)
           );
-          names[`project-${extractedIds.projectId}`] = project.name;
+          names[`project-${extractedIds.projectId}`] = project?.name ?? "Untitled Project";
         }
 
         if (extractedIds.workflowId) {
@@ -80,7 +80,7 @@ export function DynamicBreadcrumb() {
             supabase,
             Number(extractedIds.workflowId)
           );
-          names[`workflow-${extractedIds.workflowId}`] = workflow.name;
+          names[`workflow-${extractedIds.workflowId}`] = workflow?.name ?? "Untitled Workflow";
         }
 
         if (extractedIds.objectId) {
@@ -88,7 +88,7 @@ export function DynamicBreadcrumb() {
             supabase,
             Number(extractedIds.objectId)
           );
-          names[`object-${extractedIds.objectId}`] = object.title;
+          names[`object-${extractedIds.objectId}`] = object?.title ?? "Untitled Object";
         }
 
         if (extractedIds.lexiconId) {
