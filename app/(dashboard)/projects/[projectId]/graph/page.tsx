@@ -340,7 +340,7 @@ function ProjectGraphPageContent() {
           projectIdNum
         );
         if (cancelRef?.current) return;
-        setProjectName(project.name);
+        setProjectName(project?.name ?? "Untitled Project");
 
         const objects = await objectService.getObjectsByProject(
           supabase,
