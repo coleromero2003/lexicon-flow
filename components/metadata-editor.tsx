@@ -11,7 +11,6 @@ import {
   Edit2,
   Check,
   X,
-  Code,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -132,7 +131,7 @@ export function MetadataEditor({
       try {
         JSON.parse(newValue);
         setJsonError("");
-      } catch (e) {
+      } catch {
         setJsonError("Invalid JSON format");
         return;
       }
@@ -168,7 +167,7 @@ export function MetadataEditor({
       try {
         JSON.parse(editValue);
         setJsonError("");
-      } catch (e) {
+      } catch {
         setJsonError("Invalid JSON format");
         return;
       }
@@ -499,7 +498,8 @@ export function MetadataEditor({
                 className="h-8 text-sm"
                 type={newValueType === "number" ? "number" : "text"}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && newValueType !== "object" && newValueType !== "array") handleAdd();
+                  const valueType = newValueType as ValueType;
+                  if (e.key === "Enter" && valueType !== "object" && valueType !== "array") handleAdd();
                   if (e.key === "Escape") {
                     setIsAdding(false);
                     setNewKey("");

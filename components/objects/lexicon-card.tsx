@@ -35,6 +35,7 @@ interface LexiconCardProps {
   onAdd?: () => void;
   onUnlink: (lexiconId: number) => Promise<void>;
   onInheritProperties?: (lexiconId: number, attributes: Record<string, unknown>) => Promise<void>;
+  onNavigate?: (lexiconId: number) => void;
 }
 
 export function LexiconCard({
@@ -42,6 +43,7 @@ export function LexiconCard({
   onAdd,
   onUnlink,
   onInheritProperties,
+  onNavigate,
 }: LexiconCardProps) {
   const hasInheritableProps = (attributes?: Record<string, unknown>) =>
     attributes && Object.keys(attributes).length > 0;
@@ -75,8 +77,11 @@ export function LexiconCard({
                 className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 mb-1">
+                  <div
+                    className={`flex-1 min-w-0 ${onNavigate ? 'cursor-pointer' : ''}`}
+                    onClick={() => onNavigate?.(link.lexicon_id)}
+                  >
+                    <p className="text-sm font-medium text-gray-900 mb-1 hover:text-blue-600">
                       {lexiconItem.name}
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -113,7 +118,7 @@ export function LexiconCard({
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Inherit {Object.keys(lexiconItem.attributes || {}).length} properties to object metadata</p>
+                            <p>Inherit {Object.keys(lexiconItem.attributes || {}).length} properties to object properties</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export function usePdfGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [isCompiling, setIsCompiling] = useState(false);
 
   /**
    * Generate a purchase report PDF for a SCADA object
@@ -118,13 +119,61 @@ export function usePdfGeneration() {
     }
   }
 
+  /**
+   * Compile all PDFs for an object (including linked lexicon PDFs)
+   */
+  async function compilePdfs(objectId: number): Promise<Blob | null> {
+    setIsCompiling(true);
+
+    try {
+      const response = await fetch("/api/reports/compile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ objectId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to compile PDFs");
+      }
+
+      const blob = await response.blob();
+      toast.success("Successfully compiled all PDFs!");
+      return blob;
+    } catch (error) {
+      console.error("Error compiling PDFs:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to compile PDFs"
+      );
+      return null;
+    } finally {
+      setIsCompiling(false);
+    }
+  }
+
+  /**
+   * Compile and download all PDFs for an object
+   */
+  async function compileAndDownloadPdfs(objectId: number, objectTitle: string) {
+    const blob = await compilePdfs(objectId);
+    if (blob) {
+      const filename = `compiled-${objectTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
+      downloadPdf(blob, filename);
+    }
+  }
+
   return {
     isGenerating,
     isMerging,
+    isCompiling,
     generatePurchaseReport,
     generateAndDownloadReport,
     mergePdfs,
     mergeAndDownloadPdfs,
+    compilePdfs,
+    compileAndDownloadPdfs,
     downloadPdf,
   };
 }

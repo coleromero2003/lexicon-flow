@@ -74,7 +74,7 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
-  const { isGenerating, isMerging, generateAndDownloadReport, mergeAndDownloadPdfs } = usePdfGeneration();
+  const { isGenerating, isMerging, isCompiling, generateAndDownloadReport, mergeAndDownloadPdfs, compileAndDownloadPdfs } = usePdfGeneration();
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editSheetKey, setEditSheetKey] = useState(0);
@@ -528,6 +528,29 @@ export default function ObjectPage() {
     }
   };
 
+  const handleInheritLexiconProperties = async (
+    lexiconId: number,
+    attributes: Record<string, unknown>
+  ) => {
+    try {
+      if (!object) {
+        toast.error("Object data is not available");
+        return;
+      }
+
+      // Merge the lexicon attributes with existing metadata
+      const currentMetadata = object.metadata || {};
+      const updatedMetadata = { ...currentMetadata, ...attributes };
+
+      await handleMetadataUpdate(updatedMetadata);
+      toast.success(`Inherited ${Object.keys(attributes).length} properties from lexicon item`);
+    } catch (err) {
+      console.error("Failed to inherit lexicon properties", err);
+      toast.error("Failed to inherit properties");
+      throw err;
+    }
+  };
+
   const handleAddWorkflow = async (workflowId: number, stepId: number) => {
     if (!object || !supabase) return;
 
@@ -640,7 +663,7 @@ export default function ObjectPage() {
         />
 
         {/* PDF Generation Actions */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <Button
             onClick={() => generateAndDownloadReport(parsedObjectId, object.title)}
             disabled={isGenerating}
@@ -665,6 +688,15 @@ export default function ObjectPage() {
               {isMerging ? "Merging..." : `Merge ${objectFiles.filter(f => f.mime_type === "application/pdf").length} PDFs`}
             </Button>
           )}
+
+          <Button
+            onClick={() => compileAndDownloadPdfs(parsedObjectId, object.title)}
+            disabled={isCompiling}
+            variant="outline"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            {isCompiling ? "Compiling..." : "Compile All PDFs"}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
@@ -724,6 +756,7 @@ export default function ObjectPage() {
               onAdd={handleOpenLexiconDialog}
               onUnlink={handleUnlinkLexicon}
               onInheritProperties={handleInheritLexiconProperties}
+              onNavigate={(lexiconId) => router.push(`/lexicon/${lexiconId}`)}
             />
           </div>
         </div>
