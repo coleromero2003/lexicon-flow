@@ -74,7 +74,7 @@ export default function WorkflowsPage() {
             supabase,
             projectIdNum
           );
-          setProjectName(project.name);
+          setProjectName(project?.name ?? "Untitled Project");
         } catch (err) {
           console.error("Failed to load project:", err);
         }

@@ -99,6 +99,7 @@ function DroppableStep({
   const { setNodeRef, isOver } = useDroppable({ id: step.id });
   return (
     <div
+      data-testid="step-item"
       ref={setNodeRef}
       className={`w-full lg:flex-shrink-0 lg:w-80 ${
         isOver ? "bg-blue-50 rounded-lg" : ""
@@ -1069,6 +1070,7 @@ export default function WorkflowPage() {
 
               <div className="w-full lg:flex-shrink-0 lg:w-80">
                 <Button
+                  data-testid="add-step-btn"
                   variant="outline"
                   className="w-full h-full min-h-[200px] border-dashed border-2 text-gray-500 hover:text-gray-700"
                   onClick={() => setIsCreatingStep(true)}

@@ -11,7 +11,8 @@ Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition)
 - Supabase for database, authentication, and storage
 - Clerk for advanced authentication and organization management
 - Sentry for error monitoring and performance tracking
-- Vitest for testing
+- Vitest for unit/integration testing
+- Playwright for E2E testing with Clerk authentication
 - TailwindCSS 4 for styling
 - Shadcn UI components for unified design
 
@@ -27,17 +28,18 @@ npm run lint         # Run ESLint
 
 ### Testing
 ```bash
+# Unit/Integration Tests (Vitest)
 npm test             # Run tests in watch mode
 npm run test:ui      # Run tests with Vitest UI
 npm run test:run     # Run tests once (CI mode)
 npm run test:coverage # Run tests with coverage report
-```
 
-### Local Supabase
-```bash
-supabase start       # Start local Supabase instance
-supabase db push     # Push migrations to local database
-supabase stop        # Stop local Supabase instance
+# E2E Tests (Playwright)
+npm run test:e2e         # Run E2E tests (headless)
+npm run test:e2e:ui      # Run E2E tests with UI mode
+npm run test:e2e:headed  # Run E2E tests in headed mode
+npm run test:e2e:debug   # Debug E2E tests
+npm run test:e2e:report  # View last test report
 ```
 
 ## Architecture
@@ -66,8 +68,6 @@ supabase stop        # Stop local Supabase instance
   - `ui/` - shadcn/ui components (button, dialog, input, etc.)
   - `navbar.tsx` - Navigation bar component
   - `cookie-notice.tsx` - GDPR cookie consent component
-
-- **`supabase/migrations/`** - Database migrations
 
 - **`docs/`** - Documentation
   - `SENTRY.md` - Comprehensive Sentry monitoring documentation
@@ -135,16 +135,12 @@ Required environment variables (see `.env` example in README):
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
 - `CLERK_SECRET_KEY` - Clerk secret key
 
-For testing (`.env.test`):
-- `SUPABASE_URL` - Local Supabase URL (default: http://127.0.0.1:54321)
-- `SUPABASE_ANON_KEY` - Local Supabase anon key
-
 For Sentry (optional in `.env`):
 - `SENTRY_ENABLED` - Enable Sentry in development (disabled by default)
 
 ## Testing Strategy
 
-Tests are located in `lib/__tests__/`:
+**Unit/Integration Tests** are located in `lib/__tests__/`:
 - `setup.ts` - Global test setup and helper to create test Supabase client
 - `helpers.ts` - Test utilities
 - `services.test.ts` - Service layer tests
@@ -152,9 +148,16 @@ Tests are located in `lib/__tests__/`:
 
 Tests use Vitest with jsdom environment. Run local Supabase instance before running tests.
 
-## Database Schema Notes
+**E2E Tests** are located in `e2e/`:
+- `global.setup.ts` - Clerk authentication setup (runs once before all tests)
+- `dashboard.spec.ts` - Dashboard navigation and UI tests
+- `projects.spec.ts` - Project CRUD operations
+- `objects.spec.ts` - SCADA object management tests
+- `workflows.spec.ts` - Workflow and step management tests
 
-The database includes a local RLS disable migration (`99999999999999_local_disable_rls.sql`) for local development. This should NOT be used in production.
+E2E tests use Playwright with Clerk testing utilities for authentication bypass. Set `E2E_CLERK_USER_USERNAME` and `E2E_CLERK_USER_PASSWORD` in `.env` with credentials for a test user in your Clerk instance.
+
+## Database Schema Notes
 
 The main schema includes:
 
@@ -207,20 +210,6 @@ Provides direct database access and management tools:
 - `generate_typescript_types` - Generate TypeScript types from database schema
 - Edge Functions: `list_edge_functions`, `get_edge_function`, `deploy_edge_function`
 - Branching: `create_branch`, `list_branches`, `delete_branch`, `merge_branch`, `reset_branch`, `rebase_branch`
-
-### Vercel MCP Server
-Provides deployment and project management tools:
-- `search_vercel_documentation` - Search Vercel docs
-- `deploy_to_vercel` - Deploy the project
-- `list_projects` - View all Vercel projects
-- `get_project` - Get project details
-- `list_deployments` - View deployment history
-- `get_deployment` - Get deployment details
-- `get_deployment_build_logs` - View build logs for debugging
-- `get_access_to_vercel_url` - Generate shareable links for protected deployments
-- `web_fetch_vercel_url` - Fetch deployment URLs with authentication
-- `list_teams` - View team information
-- `check_domain_availability_and_price` - Domain management
 
 **Usage Tips:**
 - Use `get_advisors` regularly after schema changes to check for missing RLS policies

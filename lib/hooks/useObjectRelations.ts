@@ -46,7 +46,12 @@ export function useObjectRelations(objectId: number) {
         })
       );
 
-      setRelations(relationsWithObjects);
+      // Filter out relations where the related object doesn't exist
+      const validRelations = relationsWithObjects.filter(
+        (item): item is RelationWithObject => item.relatedObject !== null
+      );
+
+      setRelations(validRelations);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load relations");
     } finally {
