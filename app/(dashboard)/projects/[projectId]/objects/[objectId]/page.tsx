@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useOrganization } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 
@@ -17,6 +18,7 @@ import {
   EditObjectSheet,
   FilesCard,
   LexiconCard,
+  LinkLexiconDialog,
   LinkObjectDialog,
   ObjectHeader,
   PropertiesCard,
@@ -37,8 +39,13 @@ import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { objectService, workflowService } from "@/lib/services";
-import type { RelationKind, ScadaObject, Workflow } from "@/lib/supabase/models";
+import { lexiconService, objectService, workflowService } from "@/lib/services";
+import type {
+  LexiconItem,
+  RelationKind,
+  ScadaObject,
+  Workflow,
+} from "@/lib/supabase/models";
 import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
@@ -52,6 +59,7 @@ export default function ObjectPage() {
   const parsedProjectId = Number(projectId);
 
   const { supabase } = useSupabase();
+  const { organization } = useOrganization();
 
   const { object, loading, error, updateObject } = useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
@@ -91,6 +99,11 @@ export default function ObjectPage() {
   const [projectObjects, setProjectObjects] = useState<ScadaObject[]>([]);
   const [isLoadingProjectObjects, setIsLoadingProjectObjects] = useState(false);
   const [isLinkingObject, setIsLinkingObject] = useState(false);
+
+  const [isLexiconDialogOpen, setIsLexiconDialogOpen] = useState(false);
+  const [availableLexiconItems, setAvailableLexiconItems] = useState<LexiconItem[]>([]);
+  const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
+  const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
@@ -134,10 +147,44 @@ export default function ObjectPage() {
     }
   }, [parsedProjectId, supabase]);
 
+  const loadAvailableLexiconItems = useCallback(async () => {
+    if (!supabase || !organization) {
+      setAvailableLexiconItems([]);
+      return;
+    }
+
+    setIsLoadingLexiconItems(true);
+    try {
+      const items = await lexiconService.getLexiconItemsForOrg(
+        supabase,
+        organization.id
+      );
+      const linkedIds = new Set(
+        lexiconHook.lexiconLinks.map((link) => link.link.lexicon_id)
+      );
+      setAvailableLexiconItems(
+        items
+          .filter((item) => !linkedIds.has(item.id))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch (err) {
+      console.error("Failed to load lexicon items", err);
+      toast.error("Failed to load lexicon items");
+    } finally {
+      setIsLoadingLexiconItems(false);
+    }
+  }, [lexiconHook.lexiconLinks, organization, supabase]);
+
   useEffect(() => {
     loadProjectObjects();
     loadProjectWorkflows();
   }, [loadProjectObjects, loadProjectWorkflows]);
+
+  useEffect(() => {
+    if (isLexiconDialogOpen) {
+      void loadAvailableLexiconItems();
+    }
+  }, [isLexiconDialogOpen, loadAvailableLexiconItems]);
 
   const storageBucket = useMemo(
     () => "lexicon-files",
@@ -411,6 +458,16 @@ export default function ObjectPage() {
     setIsLinkDialogOpen(true);
   }, [loadProjectObjects]);
 
+  const handleOpenLexiconDialog = useCallback(() => {
+    if (!organization) {
+      toast.error("Join an organization to link lexicon items");
+      return;
+    }
+
+    void loadAvailableLexiconItems();
+    setIsLexiconDialogOpen(true);
+  }, [loadAvailableLexiconItems, organization]);
+
   const handleLinkObjects = useCallback(
     async (targetObjectId: number, relationKind: RelationKind) => {
       try {
@@ -429,6 +486,24 @@ export default function ObjectPage() {
     [relationsHook]
   );
 
+  const handleLinkLexicon = useCallback(
+    async (lexiconId: number, note: string) => {
+      try {
+        setIsLinkingLexicon(true);
+        await lexiconHook.linkLexiconItem(lexiconId, note);
+        toast.success("Lexicon item linked");
+        setIsLexiconDialogOpen(false);
+      } catch (err) {
+        console.error("Failed to link lexicon item", err);
+        toast.error("Failed to link lexicon item");
+        throw err;
+      } finally {
+        setIsLinkingLexicon(false);
+      }
+    },
+    [lexiconHook]
+  );
+
   const handleDeleteRelation = async (relationId: number) => {
     try {
       await relationsHook.deleteRelation(relationId);
@@ -444,6 +519,9 @@ export default function ObjectPage() {
     try {
       await lexiconHook.unlinkLexiconItem(lexiconId);
       toast.success("Lexicon item removed");
+      if (isLexiconDialogOpen) {
+        void loadAvailableLexiconItems();
+      }
     } catch (err) {
       console.error("Failed to unlink lexicon item", err);
       toast.error("Failed to unlink lexicon item");
@@ -646,6 +724,7 @@ export default function ObjectPage() {
 
             <LexiconCard
               lexiconLinks={lexiconHook.lexiconLinks}
+              onAdd={handleOpenLexiconDialog}
               onUnlink={handleUnlinkLexicon}
             />
           </div>
@@ -676,6 +755,21 @@ export default function ObjectPage() {
         onSubmit={handleLinkObjects}
         isSubmitting={isLinkingObject}
         isLoadingObjects={isLoadingProjectObjects}
+      />
+
+      <LinkLexiconDialog
+        open={isLexiconDialogOpen}
+        onOpenChange={setIsLexiconDialogOpen}
+        items={availableLexiconItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          manufacturer: item.manufacturer,
+          sku: item.sku,
+        }))}
+        onSubmit={handleLinkLexicon}
+        isSubmitting={isLinkingLexicon}
+        isLoadingItems={isLoadingLexiconItems}
       />
 
       <PdfViewerDialog
