@@ -216,12 +216,15 @@ async function addTitlePage(
   title: string,
   descriptionMd: string
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
   // Embed standard Helvetica fonts (built-in)
-  const font = (await (pdfDoc as any).embedFont('Helvetica')) as any;
-  const boldFont = (await (pdfDoc as any).embedFont('Helvetica-Bold')) as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const font = await (pdfDoc as any).embedFont('Helvetica');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const boldFont = await (pdfDoc as any).embedFont('Helvetica-Bold');
 
   // Draw title
   const titleFontSize = 24;
@@ -280,11 +283,14 @@ async function addTableOfContents(
   pdfDoc: PDFDocument,
   entries: { title: string; page: number; source: string }[]
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
-  const font = (await (pdfDoc as any).embedFont('Helvetica')) as any;
-  const boldFont = (await (pdfDoc as any).embedFont('Helvetica-Bold')) as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const font = await (pdfDoc as any).embedFont('Helvetica');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const boldFont = await (pdfDoc as any).embedFont('Helvetica-Bold');
 
   // Draw title
   const tocTitle = "Table of Contents";
@@ -343,6 +349,7 @@ async function addTableOfContents(
  */
 function wrapText(
   text: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   font: any,
   fontSize: number,
   maxWidth: number
