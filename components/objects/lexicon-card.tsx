@@ -10,7 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Package, Plus, Trash2 } from "lucide-react";
+import { Package, Plus, Trash2, Download } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface LexiconLinkInfo {
   link: {
@@ -20,7 +26,7 @@ interface LexiconLinkInfo {
   lexiconItem: {
     name: string;
     type: string;
-    manufacturer: string | null;
+    attributes?: Record<string, unknown>;
   };
 }
 
@@ -28,13 +34,18 @@ interface LexiconCardProps {
   lexiconLinks: LexiconLinkInfo[];
   onAdd?: () => void;
   onUnlink: (lexiconId: number) => Promise<void>;
+  onInheritProperties?: (lexiconId: number, attributes: Record<string, unknown>) => Promise<void>;
 }
 
 export function LexiconCard({
   lexiconLinks,
   onAdd,
   onUnlink,
+  onInheritProperties,
 }: LexiconCardProps) {
+  const hasInheritableProps = (attributes?: Record<string, unknown>) =>
+    attributes && Object.keys(attributes).length > 0;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -63,33 +74,59 @@ export function LexiconCard({
                 key={link.lexicon_id}
                 className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 mb-1">
                       {lexiconItem.name}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs">
                         {lexiconItem.type.replace(/_/g, " ")}
                       </Badge>
-                      {lexiconItem.manufacturer && (
-                        <p className="text-xs text-gray-500">
-                          {lexiconItem.manufacturer}
-                        </p>
+                      {hasInheritableProps(lexiconItem.attributes) && (
+                        <Badge variant="secondary" className="text-xs">
+                          {Object.keys(lexiconItem.attributes || {}).length} properties
+                        </Badge>
                       )}
                     </div>
                     {link.note && (
                       <p className="text-xs text-gray-600 mt-1">{link.note}</p>
                     )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onUnlink(link.lexicon_id)}
-                    className="opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </Button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    {onInheritProperties && hasInheritableProps(lexiconItem.attributes) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                onInheritProperties(
+                                  link.lexicon_id,
+                                  lexiconItem.attributes || {}
+                                )
+                              }
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Inherit {Object.keys(lexiconItem.attributes || {}).length} properties to object metadata</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onUnlink(link.lexicon_id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

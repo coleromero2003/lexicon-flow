@@ -220,6 +220,21 @@ export const stepService = {
     return data;
   },
 
+  async updateStepPosition(
+    supabase: SupabaseClient,
+    stepId: number,
+    position: number
+  ): Promise<Step> {
+    const { data, error } = await supabase
+      .from("steps")
+      .update({ position })
+      .eq("id", stepId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async deleteStep(
     supabase: SupabaseClient,
     stepId: number

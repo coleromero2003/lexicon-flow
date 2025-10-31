@@ -357,10 +357,7 @@ export default function LexiconItemPage() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{typeLabel}</Badge>
-              {item.sku && <Badge variant="outline">SKU: {item.sku}</Badge>}
-              {item.manufacturer && (
-                <Badge variant="outline">{item.manufacturer}</Badge>
-              )}
+              <Badge variant="outline">Version {item.version}</Badge>
             </div>
           </div>
           <div className="flex gap-2">

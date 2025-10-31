@@ -9,6 +9,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWorkflow } from "@/lib/hooks/useWorkflows";
 import { StepWithObjects, ScadaObject } from "@/lib/supabase/models";
 import { DialogTrigger } from "@radix-ui/react-dialog";
-import { Calendar, MoreHorizontal, Plus, User, Link2 } from "lucide-react";
+import { Calendar, MoreHorizontal, Plus, User, Link2, Trash2, Edit, ChevronLeft, ChevronRight } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { objectService } from "@/lib/services";
@@ -55,21 +72,29 @@ function DroppableStep({
   children,
   onCreateObject,
   onEditStep,
+  onDeleteStep,
+  onMoveStep,
   onLinkObject,
   organizationUsers,
   loadingUsers,
   assigneeValue,
   onAssigneeChange,
+  canMoveLeft,
+  canMoveRight,
 }: {
   step: StepWithObjects;
   children: React.ReactNode;
   onCreateObject: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   onEditStep: (step: StepWithObjects) => void;
+  onDeleteStep: (step: StepWithObjects) => void;
+  onMoveStep: (step: StepWithObjects, direction: 'left' | 'right') => void;
   onLinkObject: (stepId: number) => void;
   organizationUsers: Array<{ userId: string; name: string; email?: string }>;
   loadingUsers: boolean;
   assigneeValue: string[];
   onAssigneeChange: (userIds: string[]) => void;
+  canMoveLeft: boolean;
+  canMoveRight: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: step.id });
   return (
@@ -95,14 +120,46 @@ function DroppableStep({
                 {step.objects.length}
               </Badge>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-shrink-0"
-              onClick={() => onEditStep(step)}
-            >
-              <MoreHorizontal />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-shrink-0"
+                >
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEditStep(step)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Step
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onMoveStep(step, 'left')}
+                  disabled={!canMoveLeft}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Move Left
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onMoveStep(step, 'right')}
+                  disabled={!canMoveRight}
+                >
+                  <ChevronRight className="h-4 w-4 mr-2" />
+                  Move Right
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDeleteStep(step)}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Step
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -353,6 +410,7 @@ export default function WorkflowPage() {
     setSteps,
     moveObject,
     updateStep,
+    deleteStep,
   } = useWorkflow(workflowId);
   const { supabase } = useSupabase();
   const { users: organizationUsers, loading: loadingUsers } = useOrganizationUsers();
@@ -365,10 +423,14 @@ export default function WorkflowPage() {
   const [isCreatingStep, setIsCreatingStep] = useState(false);
   const [isEditingStep, setIsEditingStep] = useState(false);
   const [isLinkingObject, setIsLinkingObject] = useState(false);
+  const [isDeletingStep, setIsDeletingStep] = useState(false);
 
   const [newStepTitle, setNewStepTitle] = useState("");
   const [editingStepTitle, setEditingStepTitle] = useState("");
   const [editingStep, setEditingStep] = useState<StepWithObjects | null>(
+    null
+  );
+  const [stepToDelete, setStepToDelete] = useState<StepWithObjects | null>(
     null
   );
 
@@ -659,6 +721,53 @@ export default function WorkflowPage() {
     setEditingStepTitle(step.title);
   }
 
+  function handleDeleteStepClick(step: StepWithObjects) {
+    setStepToDelete(step);
+    setIsDeletingStep(true);
+  }
+
+  async function handleConfirmDeleteStep() {
+    if (!stepToDelete) return;
+
+    try {
+      await deleteStep(stepToDelete.id);
+      setIsDeletingStep(false);
+      setStepToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete step:", error);
+    }
+  }
+
+  async function handleMoveStep(step: StepWithObjects, direction: 'left' | 'right') {
+    const currentIndex = steps.findIndex(s => s.id === step.id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= steps.length) return;
+
+    // Optimistically update the UI
+    const newSteps = [...steps];
+    const [movedStep] = newSteps.splice(currentIndex, 1);
+    newSteps.splice(newIndex, 0, movedStep);
+    setSteps(newSteps);
+
+    // Update the positions in the database
+    try {
+      if (!supabase) throw new Error("Supabase client not initialized");
+
+      // Update both steps' positions
+      const { stepService } = await import("@/lib/services");
+      await Promise.all([
+        stepService.updateStepPosition(supabase, step.id, newIndex),
+        stepService.updateStepPosition(supabase, newSteps[currentIndex].id, currentIndex),
+      ]);
+    } catch (error) {
+      console.error("Failed to reorder steps:", error);
+      // Revert on error
+      setSteps(steps);
+    }
+  }
+
   const filteredSteps = steps.map((step) => ({
     ...step,
     objects: step.objects.filter((obj) => {
@@ -816,7 +925,7 @@ export default function WorkflowPage() {
         </Dialog>
 
         {/* Workflow Content */}
-        <main className="w-full max-w-full px-2 sm:px-4 py-4 sm:py-6">
+        <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
           <BackButton fallbackHref={`/projects/${projectId}/workflows`} className="mb-4" />
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 {workflow ? `Steps for ${workflow.name}` : 'Steps for an unassigned workflow'}
@@ -930,11 +1039,15 @@ export default function WorkflowPage() {
                   step={step}
                   onCreateObject={handleCreateObjectFromStep}
                   onEditStep={handleEditStep}
+                  onDeleteStep={handleDeleteStepClick}
+                  onMoveStep={handleMoveStep}
                   onLinkObject={handleOpenLinkDialog}
                   organizationUsers={organizationUsers}
                   loadingUsers={loadingUsers}
                   assigneeValue={stepDialogAssignee}
                   onAssigneeChange={setStepDialogAssignee}
+                  canMoveLeft={key > 0}
+                  canMoveRight={key < filteredSteps.length - 1}
                 >
                   <SortableContext
                     items={step.objects.map((obj) => obj.id)}
@@ -1096,6 +1209,33 @@ export default function WorkflowPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Step Confirmation Dialog */}
+      <AlertDialog open={isDeletingStep} onOpenChange={setIsDeletingStep}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Step</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{stepToDelete?.title}&rdquo;? This action cannot be undone.
+              {stepToDelete && stepToDelete.objects.length > 0 && (
+                <span className="block mt-2 text-red-600 font-semibold">
+                  Warning: This step contains {stepToDelete.objects.length} object{stepToDelete.objects.length !== 1 ? 's' : ''}.
+                  Deleting this step will not delete the objects, but they will be removed from this workflow.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setStepToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteStep}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

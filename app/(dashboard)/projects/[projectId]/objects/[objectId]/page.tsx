@@ -723,6 +723,7 @@ export default function ObjectPage() {
               lexiconLinks={lexiconHook.lexiconLinks}
               onAdd={handleOpenLexiconDialog}
               onUnlink={handleUnlinkLexicon}
+              onInheritProperties={handleInheritLexiconProperties}
             />
           </div>
         </div>
@@ -761,8 +762,6 @@ export default function ObjectPage() {
           id: item.id,
           name: item.name,
           type: item.type,
-          manufacturer: item.manufacturer,
-          sku: item.sku,
         }))}
         onSubmit={handleLinkLexicon}
         isSubmitting={isLinkingLexicon}

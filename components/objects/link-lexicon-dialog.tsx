@@ -28,8 +28,6 @@ interface LinkableLexiconItem {
   id: number;
   name: string;
   type: string;
-  manufacturer?: string | null;
-  sku?: string | null;
 }
 
 interface LinkLexiconDialogProps {
@@ -70,9 +68,7 @@ export function LinkLexiconDialog({
     return items.filter((item) => {
       return (
         item.name.toLowerCase().includes(lowered) ||
-        item.type.toLowerCase().includes(lowered) ||
-        (item.manufacturer && item.manufacturer.toLowerCase().includes(lowered)) ||
-        (item.sku && item.sku.toLowerCase().includes(lowered))
+        item.type.toLowerCase().includes(lowered)
       );
     });
   }, [items, searchTerm]);
@@ -153,13 +149,6 @@ export function LinkLexiconDialog({
                               {item.type.replace(/_/g, " ")}
                             </Badge>
                           </div>
-                          {(item.manufacturer || item.sku) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[item.manufacturer, item.sku]
-                                .filter(Boolean)
-                                .join(" • ")}
-                            </p>
-                          )}
                         </div>
                       </CommandItem>
                     ))}
