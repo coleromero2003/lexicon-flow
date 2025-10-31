@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { useOrganization, useSession } from "@clerk/nextjs";
 
@@ -20,11 +20,16 @@ export default function SupabaseProvider({
 }) {
   const { session } = useSession();
   const { organization } = useOrganization();
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (!session) return;
+  // Track the session user ID to detect actual session changes
+  const sessionUserId = session?.user?.id;
+  const orgId = organization?.id;
+
+  // Use useMemo to create a stable Supabase client
+  const supabase = useMemo(() => {
+    if (!session) return null;
+
     const client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -38,9 +43,19 @@ export default function SupabaseProvider({
       }
     );
 
-    setSupabase(client);
-    setIsLoaded(true);
-  }, [session, organization]);
+    return client;
+    // Only recreate when the actual user ID or org ID changes, not on every session object reference change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionUserId, orgId]);
+
+  // Set isLoaded when we have a supabase client
+  useEffect(() => {
+    if (supabase) {
+      setIsLoaded(true);
+    } else {
+      setIsLoaded(false);
+    }
+  }, [supabase]);
 
   return (
     <Context.Provider value={{ supabase, isLoaded }}>

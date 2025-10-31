@@ -1,0 +1,390 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { createClient } from "@supabase/supabase-js";
+import { PDFDocument } from "pdf-lib";
+import {
+  objectService,
+  objectFileService,
+  objectLexiconService,
+  lexiconFileService,
+} from "@/lib/services";
+
+interface PDFSource {
+  filename: string;
+  storageKey: string;
+  source: "object" | "lexicon";
+  lexiconName?: string;
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    // Authenticate with Clerk
+    const { userId, orgId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Parse request body
+    const body = await req.json();
+    const { objectId } = body;
+
+    if (!objectId || typeof objectId !== "number") {
+      return NextResponse.json(
+        { error: "objectId is required and must be a number" },
+        { status: 400 }
+      );
+    }
+
+    // Create Supabase client
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          "x-org-id": orgId || "",
+        },
+      },
+    });
+
+    // Fetch object data
+    const object = await objectService.getObject(supabase, objectId);
+
+    if (!object) {
+      return NextResponse.json({ error: "Object not found" }, { status: 404 });
+    }
+
+    // Gather all PDF files from object
+    const objectFiles = await objectFileService.getFilesForObject(
+      supabase,
+      objectId
+    );
+    const objectPdfs: PDFSource[] = objectFiles
+      .filter((file) => file.mime_type === "application/pdf")
+      .map((file) => ({
+        filename: file.filename,
+        storageKey: file.storage_key,
+        source: "object" as const,
+      }));
+
+    // Gather all linked lexicon items and their PDFs
+    const lexiconLinks = await objectLexiconService.getLexiconByObject(
+      supabase,
+      objectId
+    );
+
+    const lexiconPdfs: PDFSource[] = [];
+
+    for (const link of lexiconLinks) {
+      // Fetch lexicon item to get name
+      const { data: lexiconItem } = await supabase
+        .from("lexicon_items")
+        .select("name")
+        .eq("id", link.lexicon_id)
+        .single();
+
+      // Fetch files for this lexicon item
+      const lexiconFiles = await lexiconFileService.getFilesForLexicon(
+        supabase,
+        link.lexicon_id
+      );
+
+      const pdfs = lexiconFiles
+        .filter((file) => file.mime_type === "application/pdf")
+        .map((file) => ({
+          filename: file.filename,
+          storageKey: file.storage_key,
+          source: "lexicon" as const,
+          lexiconName: lexiconItem?.name || `Lexicon Item ${link.lexicon_id}`,
+        }));
+
+      lexiconPdfs.push(...pdfs);
+    }
+
+    const allPdfs = [...objectPdfs, ...lexiconPdfs];
+
+    if (allPdfs.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "No PDF files found for this object or its linked lexicon items",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Create the merged PDF document
+    const mergedPdf = await PDFDocument.create();
+
+    // Add title page with object description (markdown)
+    await addTitlePage(mergedPdf, object.title, object.description_md || "");
+
+    // Add table of contents page
+    let currentPageNumber = 3; // Title page is page 1, TOC is page 2
+    const tocEntries: { title: string; page: number; source: string }[] = [];
+
+    for (const pdf of allPdfs) {
+      // Download the PDF from storage to get page count
+      const { data: fileData } = await supabase.storage
+        .from("lexicon-files")
+        .download(pdf.storageKey);
+
+      if (!fileData) continue;
+
+      const pdfBytes = await fileData.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(pdfBytes);
+      const pageCount = pdfDoc.getPageCount();
+
+      const sourceLabel =
+        pdf.source === "object"
+          ? "Object File"
+          : `Lexicon: ${pdf.lexiconName}`;
+
+      tocEntries.push({
+        title: pdf.filename,
+        page: currentPageNumber,
+        source: sourceLabel,
+      });
+
+      currentPageNumber += pageCount;
+    }
+
+    await addTableOfContents(mergedPdf, tocEntries);
+
+    // Download and merge all PDFs
+    for (const pdf of allPdfs) {
+      const { data: fileData, error } = await supabase.storage
+        .from("lexicon-files")
+        .download(pdf.storageKey);
+
+      if (error || !fileData) {
+        console.error(`Failed to download file: ${pdf.filename}`, error);
+        continue;
+      }
+
+      try {
+        const pdfBytes = await fileData.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pageCount = pdfDoc.getPageCount();
+        const pages = await mergedPdf.copyPages(
+          pdfDoc,
+          Array.from({ length: pageCount }, (_, j) => j)
+        );
+
+        pages.forEach((page) => {
+          mergedPdf.addPage(page);
+        });
+      } catch (error) {
+        console.error(`Error merging PDF ${pdf.filename}:`, error);
+        // Continue with other PDFs instead of failing completely
+      }
+    }
+
+    // Save merged PDF
+    const mergedPdfBytes = await mergedPdf.save();
+
+    // Generate filename
+    const filename = `compiled-${object.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
+
+    // Return merged PDF as download
+    return new NextResponse(mergedPdfBytes, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": mergedPdfBytes.length.toString(),
+        "Cache-Control": "no-store, max-age=0",
+      },
+    });
+  } catch (error) {
+    console.error("Error compiling PDFs:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to compile PDFs",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Add a title page with the object title and description markdown
+ */
+async function addTitlePage(
+  pdfDoc: PDFDocument,
+  title: string,
+  descriptionMd: string
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
+  const { width, height } = page.getSize();
+
+  // Embed standard Helvetica fonts (built-in)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const font = await (pdfDoc as any).embedFont('Helvetica');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const boldFont = await (pdfDoc as any).embedFont('Helvetica-Bold');
+
+  // Draw title
+  const titleFontSize = 24;
+  const titleWidth = boldFont.widthOfTextAtSize(title, titleFontSize);
+  page.drawText(title, {
+    x: (width - titleWidth) / 2,
+    y: height - 100,
+    size: titleFontSize,
+    font: boldFont,
+  });
+
+  // Draw description label
+  page.drawText("Description", {
+    x: 50,
+    y: height - 160,
+    size: 14,
+    font: boldFont,
+  });
+
+  // Draw description (simplified - just raw text without markdown formatting)
+  // For a production system, you'd want to parse markdown and render it properly
+  const descriptionLines = wrapText(
+    descriptionMd || "No description provided.",
+    font,
+    12,
+    width - 100
+  );
+
+  let yPosition = height - 190;
+  for (const line of descriptionLines.slice(0, 30)) {
+    // Limit to 30 lines
+    page.drawText(line, {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      font: font,
+    });
+    yPosition -= 18;
+
+    if (yPosition < 50) break; // Don't overflow the page
+  }
+
+  // Add footer
+  page.drawText(`Compiled from Lexicon Flow`, {
+    x: 50,
+    y: 30,
+    size: 10,
+    font: font,
+  });
+}
+
+/**
+ * Add a table of contents page
+ */
+async function addTableOfContents(
+  pdfDoc: PDFDocument,
+  entries: { title: string; page: number; source: string }[]
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
+  const { width, height } = page.getSize();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const font = await (pdfDoc as any).embedFont('Helvetica');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const boldFont = await (pdfDoc as any).embedFont('Helvetica-Bold');
+
+  // Draw title
+  const tocTitle = "Table of Contents";
+  const titleFontSize = 20;
+  const titleWidth = boldFont.widthOfTextAtSize(tocTitle, titleFontSize);
+  page.drawText(tocTitle, {
+    x: (width - titleWidth) / 2,
+    y: height - 60,
+    size: titleFontSize,
+    font: boldFont,
+  });
+
+  // Draw entries
+  let yPosition = height - 100;
+  const lineHeight = 20;
+
+  for (const entry of entries) {
+    if (yPosition < 50) break; // Don't overflow the page
+
+    // Draw filename
+    const truncatedTitle =
+      entry.title.length > 50
+        ? entry.title.substring(0, 47) + "..."
+        : entry.title;
+    page.drawText(truncatedTitle, {
+      x: 50,
+      y: yPosition,
+      size: 11,
+      font: font,
+    });
+
+    // Draw source in smaller text
+    page.drawText(entry.source, {
+      x: 50,
+      y: yPosition - 12,
+      size: 9,
+      font: font,
+    });
+
+    // Draw page number
+    const pageText = `Page ${entry.page}`;
+    const pageWidth = font.widthOfTextAtSize(pageText, 11);
+    page.drawText(pageText, {
+      x: width - 50 - pageWidth,
+      y: yPosition,
+      size: 11,
+      font: font,
+    });
+
+    yPosition -= lineHeight + 12;
+  }
+}
+
+/**
+ * Wrap text to fit within a given width
+ */
+function wrapText(
+  text: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  font: any,
+  fontSize: number,
+  maxWidth: number
+): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+
+    if (testWidth > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
+// Add OPTIONS handler for CORS if needed
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}

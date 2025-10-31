@@ -8,17 +8,10 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { PriorityBadge } from "@/components/ui/priority-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
@@ -197,26 +190,6 @@ export default function ProjectDashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="container mx-auto px-4 py-6 sm:py-8 space-y-8">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{project.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{project.name}</h1>
@@ -401,7 +374,7 @@ export default function ProjectDashboardPage() {
                           </p>
                         )}
                       </div>
-                      <BadgeByPriority priority={object.priority} />
+                      <PriorityBadge priority={object.priority} />
                     </div>
                     <div className="mt-3 text-xs text-gray-500">
                       Updated {new Date(object.updated_at).toLocaleDateString()}
@@ -472,23 +445,3 @@ export default function ProjectDashboardPage() {
     </div>
   );
 }
-
-type PriorityBadgeProps = {
-  priority: ScadaObject["priority"];
-};
-
-function BadgeByPriority({ priority }: PriorityBadgeProps) {
-  const styles: Record<ScadaObject["priority"], string> = {
-    low: "bg-green-100 text-green-700",
-    medium: "bg-blue-100 text-blue-700",
-    high: "bg-amber-100 text-amber-700",
-    urgent: "bg-red-100 text-red-700",
-  };
-
-  return (
-    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${styles[priority]}`}>
-      {priority.charAt(0).toUpperCase() + priority.slice(1)}
-    </span>
-  );
-}
-

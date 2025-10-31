@@ -149,6 +149,17 @@ export const workflowService = {
     if (error) throw error;
     return data;
   },
+
+  async deleteWorkflow(
+    supabase: SupabaseClient,
+    workflowId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("workflows")
+      .delete()
+      .eq("id", workflowId);
+    if (error) throw error;
+  },
 };
 
 // =======================
@@ -207,6 +218,32 @@ export const stepService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async updateStepPosition(
+    supabase: SupabaseClient,
+    stepId: number,
+    position: number
+  ): Promise<Step> {
+    const { data, error } = await supabase
+      .from("steps")
+      .update({ position })
+      .eq("id", stepId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteStep(
+    supabase: SupabaseClient,
+    stepId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("steps")
+      .delete()
+      .eq("id", stepId);
+    if (error) throw error;
   },
 };
 

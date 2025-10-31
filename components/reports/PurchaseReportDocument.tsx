@@ -222,8 +222,7 @@ export function PurchaseReportDocument({
                   <Text style={styles.tableCol1}>{lexItem.item.name}</Text>
                   <Text style={styles.tableCol2}>{lexItem.item.type}</Text>
                   <Text style={styles.tableCol3}>
-                    {lexItem.item.sku ? `SKU: ${lexItem.item.sku}` : ""}
-                    {lexItem.item.manufacturer ? ` • ${lexItem.item.manufacturer}` : ""}
+                    Version {lexItem.item.version}
                   </Text>
                 </View>
               ))}
@@ -236,19 +235,15 @@ export function PurchaseReportDocument({
                   {lexItem.item.name}
                 </Text>
 
-                {lexItem.item.sku && (
-                  <View style={styles.row}>
-                    <Text style={styles.label}>SKU:</Text>
-                    <Text style={styles.value}>{lexItem.item.sku}</Text>
-                  </View>
-                )}
+                <View style={styles.row}>
+                  <Text style={styles.label}>Type:</Text>
+                  <Text style={styles.value}>{lexItem.item.type}</Text>
+                </View>
 
-                {lexItem.item.manufacturer && (
-                  <View style={styles.row}>
-                    <Text style={styles.label}>Manufacturer:</Text>
-                    <Text style={styles.value}>{lexItem.item.manufacturer}</Text>
-                  </View>
-                )}
+                <View style={styles.row}>
+                  <Text style={styles.label}>Version:</Text>
+                  <Text style={styles.value}>{lexItem.item.version}</Text>
+                </View>
 
                 {lexItem.item.attributes && typeof lexItem.item.attributes === "object" && Object.keys(lexItem.item.attributes).length > 0 && (
                   <View style={{ marginTop: 5 }}>

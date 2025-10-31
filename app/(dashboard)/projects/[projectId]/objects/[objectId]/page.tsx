@@ -3,21 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useOrganization } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { Button } from "@/components/ui/button";
-import { BackButton } from "@/components/ui/back-button";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -26,6 +17,7 @@ import {
   EditObjectSheet,
   FilesCard,
   LexiconCard,
+  LinkLexiconDialog,
   LinkObjectDialog,
   ObjectHeader,
   PropertiesCard,
@@ -46,8 +38,13 @@ import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { objectService, projectService, workflowService } from "@/lib/services";
-import type { RelationKind, ScadaObject, Workflow } from "@/lib/supabase/models";
+import { lexiconService, objectService, workflowService } from "@/lib/services";
+import type {
+  LexiconItem,
+  RelationKind,
+  ScadaObject,
+  Workflow,
+} from "@/lib/supabase/models";
 import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
@@ -61,25 +58,7 @@ export default function ObjectPage() {
   const parsedProjectId = Number(projectId);
 
   const { supabase } = useSupabase();
-  const [projectName, setProjectName] = useState<string>("");
-
-  // Load project name for breadcrumbs
-  useEffect(() => {
-    async function loadProject() {
-      if (parsedProjectId && supabase) {
-        try {
-          const project = await projectService.getProjectById(
-            supabase,
-            parsedProjectId
-          );
-          setProjectName(project.name);
-        } catch (err) {
-          console.error("Failed to load project:", err);
-        }
-      }
-    }
-    loadProject();
-  }, [parsedProjectId, supabase]);
+  const { organization } = useOrganization();
 
   const { object, loading, error, updateObject } = useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
@@ -95,7 +74,7 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
-  const { isGenerating, isMerging, generateAndDownloadReport, mergeAndDownloadPdfs } = usePdfGeneration();
+  const { isGenerating, isMerging, isCompiling, generateAndDownloadReport, mergeAndDownloadPdfs, compileAndDownloadPdfs } = usePdfGeneration();
 
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [editSheetKey, setEditSheetKey] = useState(0);
@@ -119,6 +98,11 @@ export default function ObjectPage() {
   const [projectObjects, setProjectObjects] = useState<ScadaObject[]>([]);
   const [isLoadingProjectObjects, setIsLoadingProjectObjects] = useState(false);
   const [isLinkingObject, setIsLinkingObject] = useState(false);
+
+  const [isLexiconDialogOpen, setIsLexiconDialogOpen] = useState(false);
+  const [availableLexiconItems, setAvailableLexiconItems] = useState<LexiconItem[]>([]);
+  const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
+  const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
@@ -162,10 +146,44 @@ export default function ObjectPage() {
     }
   }, [parsedProjectId, supabase]);
 
+  const loadAvailableLexiconItems = useCallback(async () => {
+    if (!supabase || !organization) {
+      setAvailableLexiconItems([]);
+      return;
+    }
+
+    setIsLoadingLexiconItems(true);
+    try {
+      const items = await lexiconService.getLexiconItemsForOrg(
+        supabase,
+        organization.id
+      );
+      const linkedIds = new Set(
+        lexiconHook.lexiconLinks.map((link) => link.link.lexicon_id)
+      );
+      setAvailableLexiconItems(
+        items
+          .filter((item) => !linkedIds.has(item.id))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch (err) {
+      console.error("Failed to load lexicon items", err);
+      toast.error("Failed to load lexicon items");
+    } finally {
+      setIsLoadingLexiconItems(false);
+    }
+  }, [lexiconHook.lexiconLinks, organization, supabase]);
+
   useEffect(() => {
     loadProjectObjects();
     loadProjectWorkflows();
   }, [loadProjectObjects, loadProjectWorkflows]);
+
+  useEffect(() => {
+    if (isLexiconDialogOpen) {
+      void loadAvailableLexiconItems();
+    }
+  }, [isLexiconDialogOpen, loadAvailableLexiconItems]);
 
   const storageBucket = useMemo(
     () => "lexicon-files",
@@ -405,12 +423,49 @@ export default function ObjectPage() {
     [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
   );
 
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      if (!object) {
+        toast.error("Object data is still loading");
+        return;
+      }
+
+      try {
+        await uploadObjectFile({
+          file,
+          projectId: parsedProjectId,
+          objectId: parsedObjectId,
+          objectSlug: object.title,
+        });
+
+        await reloadFiles();
+        toast.success("File uploaded");
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        toast.error(
+          err instanceof Error ? err.message : "Failed to upload file"
+        );
+      }
+    },
+    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+  );
+
   const handleViewFile = openObjectFile;
 
   const handleOpenLinkDialog = useCallback(() => {
     void loadProjectObjects();
     setIsLinkDialogOpen(true);
   }, [loadProjectObjects]);
+
+  const handleOpenLexiconDialog = useCallback(() => {
+    if (!organization) {
+      toast.error("Join an organization to link lexicon items");
+      return;
+    }
+
+    void loadAvailableLexiconItems();
+    setIsLexiconDialogOpen(true);
+  }, [loadAvailableLexiconItems, organization]);
 
   const handleLinkObjects = useCallback(
     async (targetObjectId: number, relationKind: RelationKind) => {
@@ -430,6 +485,24 @@ export default function ObjectPage() {
     [relationsHook]
   );
 
+  const handleLinkLexicon = useCallback(
+    async (lexiconId: number, note: string) => {
+      try {
+        setIsLinkingLexicon(true);
+        await lexiconHook.linkLexiconItem(lexiconId, note);
+        toast.success("Lexicon item linked");
+        setIsLexiconDialogOpen(false);
+      } catch (err) {
+        console.error("Failed to link lexicon item", err);
+        toast.error("Failed to link lexicon item");
+        throw err;
+      } finally {
+        setIsLinkingLexicon(false);
+      }
+    },
+    [lexiconHook]
+  );
+
   const handleDeleteRelation = async (relationId: number) => {
     try {
       await relationsHook.deleteRelation(relationId);
@@ -445,9 +518,35 @@ export default function ObjectPage() {
     try {
       await lexiconHook.unlinkLexiconItem(lexiconId);
       toast.success("Lexicon item removed");
+      if (isLexiconDialogOpen) {
+        void loadAvailableLexiconItems();
+      }
     } catch (err) {
       console.error("Failed to unlink lexicon item", err);
       toast.error("Failed to unlink lexicon item");
+      throw err;
+    }
+  };
+
+  const handleInheritLexiconProperties = async (
+    lexiconId: number,
+    attributes: Record<string, unknown>
+  ) => {
+    try {
+      if (!object) {
+        toast.error("Object data is not available");
+        return;
+      }
+
+      // Merge the lexicon attributes with existing metadata
+      const currentMetadata = object.metadata || {};
+      const updatedMetadata = { ...currentMetadata, ...attributes };
+
+      await handleMetadataUpdate(updatedMetadata);
+      toast.success(`Inherited ${Object.keys(attributes).length} properties from lexicon item`);
+    } catch (err) {
+      console.error("Failed to inherit lexicon properties", err);
+      toast.error("Failed to inherit properties");
       throw err;
     }
   };
@@ -553,39 +652,6 @@ export default function ObjectPage() {
       />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={`/projects/${projectId}`}>{projectName || "Project"}</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href={`/projects/${projectId}/objects`}>Objects</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{object.title}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <BackButton fallbackHref={`/projects/${projectId}/objects`} className="mb-4" />
 
         <ObjectHeader
           object={object}
@@ -594,11 +660,10 @@ export default function ObjectPage() {
             name,
           }))}
           onEdit={handleOpenEditSheet}
-          onBack={() => router.push(`/projects/${projectId}/objects`)}
         />
 
         {/* PDF Generation Actions */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <Button
             onClick={() => generateAndDownloadReport(parsedObjectId, object.title)}
             disabled={isGenerating}
@@ -623,6 +688,15 @@ export default function ObjectPage() {
               {isMerging ? "Merging..." : `Merge ${objectFiles.filter(f => f.mime_type === "application/pdf").length} PDFs`}
             </Button>
           )}
+
+          <Button
+            onClick={() => compileAndDownloadPdfs(parsedObjectId, object.title)}
+            disabled={isCompiling}
+            variant="outline"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            {isCompiling ? "Compiling..." : "Compile All PDFs"}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
@@ -635,6 +709,7 @@ export default function ObjectPage() {
             <WorkflowsCard
               workflows={object.workflows}
               availableWorkflows={projectWorkflows}
+              projectId={parsedProjectId}
               onAddWorkflow={handleAddWorkflow}
               onRemoveWorkflow={handleRemoveWorkflow}
               loading={isLoadingWorkflows}
@@ -651,6 +726,7 @@ export default function ObjectPage() {
             <FilesCard
               files={objectFiles}
               onUpload={handleUploadClick}
+              onFileDrop={handleFileDrop}
               onUnlink={handleUnlinkFile}
               onDelete={handleDeleteFile}
               onView={handleViewFile}
@@ -677,7 +753,10 @@ export default function ObjectPage() {
 
             <LexiconCard
               lexiconLinks={lexiconHook.lexiconLinks}
+              onAdd={handleOpenLexiconDialog}
               onUnlink={handleUnlinkLexicon}
+              onInheritProperties={handleInheritLexiconProperties}
+              onNavigate={(lexiconId) => router.push(`/lexicon/${lexiconId}`)}
             />
           </div>
         </div>
@@ -707,6 +786,19 @@ export default function ObjectPage() {
         onSubmit={handleLinkObjects}
         isSubmitting={isLinkingObject}
         isLoadingObjects={isLoadingProjectObjects}
+      />
+
+      <LinkLexiconDialog
+        open={isLexiconDialogOpen}
+        onOpenChange={setIsLexiconDialogOpen}
+        items={availableLexiconItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type,
+        }))}
+        onSubmit={handleLinkLexicon}
+        isSubmitting={isLinkingLexicon}
+        isLoadingItems={isLoadingLexiconItems}
       />
 
       <PdfViewerDialog

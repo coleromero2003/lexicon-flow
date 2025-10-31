@@ -9,20 +9,13 @@ import { toast } from "sonner";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,8 +45,6 @@ const LEXICON_TYPES: LexiconType[] = [
 type FormState = {
   name: string;
   type: LexiconType;
-  manufacturer: string;
-  sku: string;
   notes: string;
   version: number;
 };
@@ -63,8 +54,6 @@ const defaultType: LexiconType = "part";
 const createInitialFormState = (): FormState => ({
   name: "",
   type: defaultType,
-  manufacturer: "",
-  sku: "",
   notes: "",
   version: 1,
 });
@@ -155,9 +144,7 @@ export default function LexiconPage() {
         return true;
       }
 
-      const haystack = `${item.name} ${item.manufacturer ?? ""} ${
-        item.sku ?? ""
-      }`.toLowerCase();
+      const haystack = `${item.name}`.toLowerCase();
       return haystack.includes(normalizedQuery);
     });
   }, [lexiconItems, normalizedQuery, typeFilter]);
@@ -199,8 +186,6 @@ export default function LexiconPage() {
         org_id: organization.id,
         type: formState.type,
         name: formState.name.trim(),
-        manufacturer: formState.manufacturer.trim() || null,
-        sku: formState.sku.trim() || null,
         attributes,
         version: Number.isNaN(formState.version) ? 1 : formState.version,
       });
@@ -231,20 +216,7 @@ export default function LexiconPage() {
   }
 
   if (!organization) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="mb-4 text-2xl font-bold text-gray-900">
-              No Organization Selected
-            </h2>
-            <p className="text-gray-600">
-              Please select or create an organization to manage your lexicon.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
+    return <NoOrganizationState />;
   }
 
   if (loading) {
@@ -266,28 +238,7 @@ export default function LexiconPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Lexicon</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
         <div className="mb-6 sm:mb-8">
           <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -375,55 +326,6 @@ export default function LexiconPage() {
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {formState.type === "part" ? (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="lexicon-manufacturer">Manufacturer</Label>
-                          <Input
-                            id="lexicon-manufacturer"
-                            value={formState.manufacturer}
-                            onChange={(event) =>
-                              setFormState((prev) => ({
-                                ...prev,
-                                manufacturer: event.target.value,
-                              }))
-                            }
-                            placeholder="e.g. Rockwell Automation"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="lexicon-sku">SKU / Catalog number</Label>
-                          <Input
-                            id="lexicon-sku"
-                            value={formState.sku}
-                            onChange={(event) =>
-                              setFormState((prev) => ({
-                                ...prev,
-                                sku: event.target.value,
-                              }))
-                            }
-                            placeholder="Optional"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label htmlFor="lexicon-sku">SKU / Catalog number</Label>
-                        <Input
-                          id="lexicon-sku"
-                          value={formState.sku}
-                          onChange={(event) =>
-                            setFormState((prev) => ({
-                              ...prev,
-                              sku: event.target.value,
-                            }))
-                          }
-                          placeholder="Optional"
-                        />
-                      </div>
-                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="lexicon-notes">Notes</Label>
@@ -592,31 +494,15 @@ export default function LexiconPage() {
                               {item.name}
                             </CardTitle>
                             <CardDescription>
-                              {item.manufacturer || "Manufacturer TBD"}
+                              {LEXICON_TYPE_LABELS[item.type]}
                             </CardDescription>
                           </div>
                           <Badge variant="secondary">
-                            {LEXICON_TYPE_LABELS[item.type]}
+                            Version {item.version}
                           </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-xs font-medium uppercase text-gray-500">
-                              SKU
-                            </p>
-                            <p className="text-gray-900">
-                              {item.sku ? item.sku : "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium uppercase text-gray-500">
-                              Version
-                            </p>
-                            <p className="text-gray-900">{item.version}</p>
-                          </div>
-                        </div>
                         {notes && (
                           <p className="line-clamp-2 text-sm text-gray-600">
                             {notes}

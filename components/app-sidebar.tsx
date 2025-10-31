@@ -7,7 +7,6 @@ import { useOrganization, UserButton, useUser } from "@clerk/nextjs";
 import {
   Building2,
   FolderKanban,
-  Plus,
   Workflow,
   Box,
   Network,
@@ -15,13 +14,13 @@ import {
   ArrowLeft,
   ArrowRight,
   LayoutDashboard,
+  Library,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -82,16 +81,12 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
+      <SidebarSeparator />
+
       <SidebarContent>
         {/* Dashboard access */}
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
-          <SidebarGroupAction asChild>
-            <Link href="/dashboard?action=create">
-              <Plus className="h-4 w-4" />
-              <span className="sr-only">Create Project</span>
-            </Link>
-          </SidebarGroupAction>
+          <SidebarGroupLabel>Hub</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -103,6 +98,18 @@ export function AppSidebar() {
                   <Link href="/dashboard">
                     <LayoutDashboard />
                     <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/lexicon" || pathname.startsWith("/lexicon/")}
+                  tooltip="Lexicon Items"
+                >
+                  <Link href="/lexicon">
+                    <Library />
+                    <span>Lexicon</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -128,17 +135,11 @@ export function AppSidebar() {
                   <span>Forward</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Return to Dashboard">
-                  <Link href="/dashboard">
-                    <FolderKanban />
-                    <span>Go to Dashboard</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarSeparator />
 
         {selectedProject && (
           <>

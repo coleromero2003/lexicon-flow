@@ -4,18 +4,12 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization, useUser } from "@clerk/nextjs";
-import { BookOpen, Calendar, ClipboardList, Download, FileText, Layers, Link2, Plus, Save, Trash2, Upload } from "lucide-react";
+import { BookOpen, Calendar, ClipboardList, Layers, Link2, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { FilesCard } from "@/components/objects/files-card";
 import { Button } from "@/components/ui/button";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -25,6 +19,7 @@ import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, lexiconFileService, fileService } from "@/lib/services";
 import type { LexiconItem, ScadaObject, FileMeta } from "@/lib/supabase/models";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
+import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +54,20 @@ export default function LexiconItemPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
+
+  const storageBucket = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "lexicon-files";
+
+  const handleFileViewerError = useCallback((error: Error) => {
+    toast.error(error.message);
+  }, []);
+
+  const { openFile, setViewerOpen, state } = useSupabaseFileViewer({
+    supabase,
+    bucket: storageBucket,
+    onError: handleFileViewerError,
+  });
+
+  const { isViewerOpen, viewerFile, viewerUrl, viewerLoading, viewingFileId } = state;
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -142,32 +151,28 @@ export default function LexiconItemPage() {
     }
   }, [supabase, item, lexiconId, uploadLexiconFile]);
 
-  const handleFileDownload = useCallback(async (file: FileMeta) => {
-    if (!supabase) return;
+  const handleFileDrop = useCallback(async (file: File) => {
+    if (!supabase || !item) return;
 
     try {
-      const { data, error } = await supabase.storage
-        .from(process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET || "lexicon-files")
-        .download(file.storage_key);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const uploadedFile = await uploadLexiconFile({
+        file,
+        lexiconId,
+        lexiconSlug: item.name,
+      });
+      setFiles((prev) => [...prev, uploadedFile]);
+      toast.success("File uploaded successfully");
     } catch (err) {
-      console.error("Failed to download file", err);
-      toast.error("Failed to download file");
+      console.error("Failed to upload file", err);
+      toast.error("Failed to upload file");
     }
-  }, [supabase]);
+  }, [supabase, item, lexiconId, uploadLexiconFile]);
 
-  const handleFileDelete = useCallback(async (file: FileMeta) => {
+  const handleFileDelete = useCallback(async (fileId: number) => {
     if (!supabase) return;
+
+    const file = files.find((f) => f.id === fileId);
+    if (!file) return;
 
     try {
       // Delete from storage
@@ -178,15 +183,15 @@ export default function LexiconItemPage() {
       if (storageError) throw storageError;
 
       // Delete file metadata
-      await fileService.deleteFile(supabase, file.id);
+      await fileService.deleteFile(supabase, fileId);
 
-      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
       toast.success("File deleted");
     } catch (err) {
       console.error("Failed to delete file", err);
       toast.error("Failed to delete file");
     }
-  }, [supabase]);
+  }, [supabase, files]);
 
   const handleAddAttribute = useCallback(async () => {
     if (!supabase || !item || !newAttributeKey.trim()) {
@@ -308,31 +313,6 @@ export default function LexiconItemPage() {
     <div className="min-h-screen bg-gray-50">
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-        <Breadcrumb className="mb-4">
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Dashboard</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/lexicon">Lexicon</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{item.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -344,10 +324,7 @@ export default function LexiconItemPage() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{typeLabel}</Badge>
-              {item.sku && <Badge variant="outline">SKU: {item.sku}</Badge>}
-              {item.manufacturer && (
-                <Badge variant="outline">{item.manufacturer}</Badge>
-              )}
+              <Badge variant="outline">Version {item.version}</Badge>
             </div>
           </div>
           <div className="flex gap-2">
@@ -473,74 +450,21 @@ export default function LexiconItemPage() {
           </div>
 
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Files</CardTitle>
-                    <CardDescription>
-                      Documents and files attached to this item.
-                    </CardDescription>
-                  </div>
-                  <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    {isUploading ? "Uploading..." : "Upload"}
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </div>
-              </CardHeader>
-              <CardContent>
-                {files.length === 0 ? (
-                  <EmptyState
-                    icon={<FileText className="h-8 w-8" />}
-                    title="No files"
-                    description="Upload documents, datasheets, or specs for this item."
-                  />
-                ) : (
-                  <div className="space-y-2">
-                    {files.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {file.filename}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {file.size_bytes ? `${(file.size_bytes / 1024).toFixed(1)} KB` : "Unknown size"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleFileDownload(file)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleFileDelete(file)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <FilesCard
+              files={files}
+              onUpload={() => fileInputRef.current?.click()}
+              onFileDrop={handleFileDrop}
+              onDelete={handleFileDelete}
+              onView={openFile}
+              isUploading={isUploading}
+              viewingFileId={viewingFileId}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
 
             <Card>
               <CardHeader>
@@ -594,6 +518,14 @@ export default function LexiconItemPage() {
           </div>
         </div>
       </main>
+
+      <PdfViewerDialog
+        open={isViewerOpen}
+        onOpenChange={setViewerOpen}
+        file={viewerFile}
+        url={viewerUrl}
+        loading={viewerLoading}
+      />
     </div>
   );
 }

@@ -130,8 +130,6 @@ export interface LexiconItem {
   org_id: string;
   type: LexiconType;
   name: string;
-  sku: string | null;
-  manufacturer: string | null;
   attributes: Record<string, unknown>;
   version: number;
 }
