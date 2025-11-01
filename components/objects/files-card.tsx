@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Loader2, Plus, Trash2, Unlink, Download, Table } from "lucide-react";
+import { FileText, Loader2, Plus, Trash2, Unlink, Download, Table, ImageIcon } from "lucide-react";
 
 import type { FileMeta } from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
@@ -25,13 +25,27 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 
 // Helper to determine file type from mime type and filename
-function getFileType(file: FileMeta): "pdf" | "excel" | "other" {
+function getFileType(file: FileMeta): "pdf" | "excel" | "image" | "other" {
   const mimeType = (file.mime_type ?? "").toLowerCase();
   const fileName = file.filename.toLowerCase();
 
   // Check for PDF
   if (mimeType.includes("pdf") || fileName.endsWith(".pdf")) {
     return "pdf";
+  }
+
+  // Check for images
+  if (
+    mimeType.includes("image") ||
+    fileName.endsWith(".png") ||
+    fileName.endsWith(".jpg") ||
+    fileName.endsWith(".jpeg") ||
+    fileName.endsWith(".gif") ||
+    fileName.endsWith(".webp") ||
+    fileName.endsWith(".svg") ||
+    fileName.endsWith(".bmp")
+  ) {
+    return "image";
   }
 
   // Check for Excel files
@@ -185,10 +199,11 @@ export function FilesCard({
               const fileType = getFileType(file);
               const isPdf = fileType === "pdf";
               const isExcel = fileType === "excel";
+              const isImage = fileType === "image";
 
               // Determine icon based on file type
-              const FileIcon = isExcel ? Table : isPdf ? FileText : Download;
-              const iconColor = isExcel ? "text-green-600" : isPdf ? "text-blue-600" : "text-gray-600";
+              const FileIcon = isImage ? ImageIcon : isExcel ? Table : isPdf ? FileText : Download;
+              const iconColor = isImage ? "text-purple-600" : isExcel ? "text-green-600" : isPdf ? "text-blue-600" : "text-gray-600";
 
               return (
                 <div
