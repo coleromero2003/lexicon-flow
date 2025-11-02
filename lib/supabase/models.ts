@@ -123,6 +123,13 @@ export interface LexiconFileLink {
 }
 
 // ===== LEXICON ITEMS =====
+export interface PartAttributes {
+  part_number: string;
+  manufacturer: string;
+  description: string;
+  [key: string]: unknown; // Allow additional custom attributes
+}
+
 export interface LexiconItem {
   id: number;
   created_at: string;
@@ -132,6 +139,26 @@ export interface LexiconItem {
   name: string;
   attributes: Record<string, unknown>;
   version: number;
+}
+
+// Typed variant for parts
+export type PartLexiconItem = Omit<LexiconItem, 'type' | 'attributes'> & {
+  type: 'part';
+  attributes: PartAttributes;
+};
+
+// ===== PART LIST =====
+export interface PartListEntry {
+  lexicon_id?: number | null; // Optional - null for manually added parts
+  part_number: string;
+  manufacturer: string;
+  description: string;
+  quantity: number;
+}
+
+export interface ObjectMetadata extends Record<string, unknown> {
+  parts_list?: PartListEntry[];
+  parts_table_hidden?: boolean; // Controls visibility of the parts table
 }
 
 export type ObjectWithFiles = ScadaObject & { files: FileMeta[] };

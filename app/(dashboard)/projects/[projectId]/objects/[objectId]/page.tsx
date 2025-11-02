@@ -29,6 +29,8 @@ import {
   RELATION_KIND_OPTIONS,
 } from "@/components/objects";
 import type { PriorityValue } from "@/components/objects";
+import { PartsListCard } from "@/components/objects/parts-list-card";
+import { partListService } from "@/lib/services";
 import { useObject } from "@/lib/hooks/useObjects";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { useSubtasks } from "@/lib/hooks/useSubtasks";
@@ -62,7 +64,8 @@ export default function ObjectPage() {
   const { supabase } = useSupabase();
   const { organization } = useOrganization();
 
-  const { object, loading, error, updateObject } = useObject(parsedObjectId);
+  const { object, loading, error, updateObject, reloadObject } =
+    useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
   const {
     files: objectFiles,
@@ -76,7 +79,14 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
-  const { isGenerating, isMerging, isCompiling, generateAndDownloadReport, mergeAndDownloadPdfs, compileAndDownloadPdfs } = usePdfGeneration();
+  const {
+    isGenerating,
+    isMerging,
+    isCompiling,
+    generateAndDownloadReport,
+    mergeAndDownloadPdfs,
+    compileAndDownloadPdfs,
+  } = usePdfGeneration();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editDialogKey, setEditDialogKey] = useState(0);
@@ -102,11 +112,14 @@ export default function ObjectPage() {
   const [isLinkingObject, setIsLinkingObject] = useState(false);
 
   const [isLexiconDialogOpen, setIsLexiconDialogOpen] = useState(false);
-  const [availableLexiconItems, setAvailableLexiconItems] = useState<LexiconItem[]>([]);
+  const [availableLexiconItems, setAvailableLexiconItems] = useState<
+    LexiconItem[]
+  >([]);
   const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
   const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
 
-  const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] = useState(false);
+  const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] =
+    useState(false);
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
@@ -192,10 +205,7 @@ export default function ObjectPage() {
     }
   }, [isLexiconDialogOpen, loadAvailableLexiconItems]);
 
-  const storageBucket = useMemo(
-    () => "lexicon-files",
-    []
-  );
+  const storageBucket = useMemo(() => "lexicon-files", []);
 
   const linkedObjectIds = useMemo(
     () => relationsHook.relations.map((relation) => relation.relatedObject.id),
@@ -360,12 +370,43 @@ export default function ObjectPage() {
 
   const handleMetadataUpdate = async (metadata: Record<string, unknown>) => {
     try {
-      await updateObject({ metadata });
+      // Preserve parts_list and parts_table_hidden when updating other metadata
+      const currentMetadata = object?.metadata || {};
+      const { parts_list, parts_table_hidden } = currentMetadata as {
+        parts_list?: unknown;
+        parts_table_hidden?: boolean;
+      };
+const updatedMetadata = {
+  ...metadata,
+  ...(parts_list !== undefined && !('parts_list' in metadata) && { parts_list }),
+  ...(parts_table_hidden !== undefined &&
+    !('parts_table_hidden' in metadata) && { parts_table_hidden }),
+};
+      await updateObject({ metadata: updatedMetadata });
       toast.success("Properties updated");
     } catch (err) {
       console.error("Failed to update properties", err);
       toast.error("Failed to update properties");
       throw err;
+    }
+  };
+
+  const handleTogglePartsTableVisibility = async () => {
+    if (!object) return;
+
+    const currentMetadata = object.metadata || {};
+    const isCurrentlyHidden =
+      (currentMetadata as { parts_table_hidden?: boolean })
+        .parts_table_hidden || false;
+
+    try {
+      await handleMetadataUpdate({
+        ...currentMetadata,
+        parts_table_hidden: !isCurrentlyHidden,
+      });
+    } catch (err) {
+      console.error("Failed to toggle parts table visibility", err);
+      toast.error("Failed to toggle parts table visibility");
     }
   };
 
@@ -460,7 +501,14 @@ export default function ObjectPage() {
         setFileToUpload(null);
       }
     },
-    [fileToUpload, object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+    [
+      fileToUpload,
+      object,
+      parsedObjectId,
+      parsedProjectId,
+      reloadFiles,
+      uploadObjectFile,
+    ]
   );
 
   const handleCancelRename = useCallback(() => {
@@ -560,7 +608,11 @@ export default function ObjectPage() {
       const updatedMetadata = { ...currentMetadata, ...attributes };
 
       await handleMetadataUpdate(updatedMetadata);
-      toast.success(`Inherited ${Object.keys(attributes).length} properties from lexicon item`);
+      toast.success(
+        `Inherited ${
+          Object.keys(attributes).length
+        } properties from lexicon item`
+      );
     } catch (err) {
       console.error("Failed to inherit lexicon properties", err);
       toast.error("Failed to inherit properties");
@@ -648,7 +700,10 @@ export default function ObjectPage() {
               "The object you&rsquo;re looking for doesn&rsquo;t exist or has been deleted."
             }
             action={
-              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/objects`)}>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/projects/${projectId}/objects`)}
+              >
                 Go Back
               </Button>
             }
@@ -660,7 +715,6 @@ export default function ObjectPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <input
         ref={fileInputRef}
         type="file"
@@ -669,7 +723,6 @@ export default function ObjectPage() {
       />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-
         <ObjectHeader
           object={object}
           orgUsers={organizationUsers.map(({ userId, name }) => ({
@@ -677,12 +730,19 @@ export default function ObjectPage() {
             name,
           }))}
           onEdit={handleOpenEditDialog}
+          isPartsTableHidden={
+            (object.metadata as { parts_table_hidden?: boolean })
+              ?.parts_table_hidden || false
+          }
+          onTogglePartsTable={handleTogglePartsTableVisibility}
         />
 
         {/* PDF Generation Actions */}
         <div className="flex gap-2 mb-4 flex-wrap">
           <Button
-            onClick={() => generateAndDownloadReport(parsedObjectId, object.title)}
+            onClick={() =>
+              generateAndDownloadReport(parsedObjectId, object.title)
+            }
             disabled={isGenerating}
             variant="outline"
           >
@@ -690,19 +750,25 @@ export default function ObjectPage() {
             {isGenerating ? "Generating..." : "Generate Purchase Report"}
           </Button>
 
-          {objectFiles.filter(f => f.mime_type === "application/pdf").length > 1 && (
+          {objectFiles.filter((f) => f.mime_type === "application/pdf").length >
+            1 && (
             <Button
               onClick={() => {
                 const pdfFileIds = objectFiles
-                  .filter(f => f.mime_type === "application/pdf")
-                  .map(f => f.id);
+                  .filter((f) => f.mime_type === "application/pdf")
+                  .map((f) => f.id);
                 mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
               }}
               disabled={isMerging}
               variant="outline"
             >
               <FilePlus2 className="h-4 w-4 mr-2" />
-              {isMerging ? "Merging..." : `Merge ${objectFiles.filter(f => f.mime_type === "application/pdf").length} PDFs`}
+              {isMerging
+                ? "Merging..."
+                : `Merge ${
+                    objectFiles.filter((f) => f.mime_type === "application/pdf")
+                      .length
+                  } PDFs`}
             </Button>
           )}
 
@@ -748,6 +814,15 @@ export default function ObjectPage() {
               onReorder={handleReorderSubtasks}
             />
 
+            {!(object.metadata as { parts_table_hidden?: boolean })
+              ?.parts_table_hidden && (
+              <PartsListCard
+                objectId={parsedObjectId}
+                parts={partListService.getPartsList(object)}
+                onUpdate={reloadObject}
+              />
+            )}
+
             <FilesCard
               files={objectFiles}
               onUpload={handleUploadClick}
@@ -762,7 +837,12 @@ export default function ObjectPage() {
 
           <div className="space-y-6">
             <PropertiesCard
-              metadata={object.metadata || {}}
+              metadata={(() => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { parts_list, parts_table_hidden, ...rest } =
+                  object.metadata || {};
+                return rest;
+              })()}
               suggestions={metadataSuggestions}
               onUpdate={handleMetadataUpdate}
             />

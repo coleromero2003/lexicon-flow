@@ -11,6 +11,9 @@ import {
   LexiconFileLink,
   LexiconItem,
   LexiconType,
+  PartAttributes,
+  PartListEntry,
+  ObjectMetadata,
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
@@ -27,6 +30,27 @@ function isScadaObject(value: unknown): value is ScadaObject {
     typeof candidate.sort_order === "number" &&
     typeof candidate.priority === "string"
   );
+}
+
+// Helper to validate part attributes
+function isValidPartAttributes(attributes: Record<string, unknown>): attributes is PartAttributes {
+  return (
+    typeof attributes.part_number === 'string' &&
+    attributes.part_number.trim() !== '' &&
+    typeof attributes.manufacturer === 'string' &&
+    attributes.manufacturer.trim() !== '' &&
+    typeof attributes.description === 'string' &&
+    attributes.description.trim() !== ''
+  );
+}
+
+// Helper to validate lexicon item before create/update
+function validateLexiconItem(item: Partial<LexiconItem>): void {
+  if (item.type === 'part' && item.attributes) {
+    if (!isValidPartAttributes(item.attributes)) {
+      throw new Error('Part lexicon items must have part_number, manufacturer, and description in attributes');
+    }
+  }
 }
 
 // =======================
@@ -792,6 +816,9 @@ export const lexiconService = {
     supabase: SupabaseClient,
     item: Omit<LexiconItem, "id" | "created_at" | "updated_at">
   ): Promise<LexiconItem> {
+    // Validate before inserting
+    validateLexiconItem(item);
+
     const { data, error } = await supabase
       .from("lexicon_items")
       .insert(item)
@@ -806,6 +833,14 @@ export const lexiconService = {
     lexiconId: number,
     updates: Partial<Omit<LexiconItem, "id" | "created_at" | "updated_at" | "org_id">>
   ): Promise<LexiconItem> {
+    // If updating a part, validate the attributes
+    if (updates.type === 'part' || updates.attributes) {
+      // Fetch current item to check type
+      const current = await this.getLexiconItem(supabase, lexiconId);
+      const itemToValidate = { ...current, ...updates };
+      validateLexiconItem(itemToValidate);
+    }
+
     const { data, error } = await supabase
       .from("lexicon_items")
       .update(updates)
@@ -857,6 +892,260 @@ export const lexiconFileService = {
       .in("lexicon_id", uniqueIds);
     if (error) throw error;
     return data || [];
+  },
+};
+
+// =======================
+// PART LIST SERVICES
+// =======================
+export const partListService = {
+  /**
+   * Get the part list from an object's metadata
+   */
+  getPartsList(object: ScadaObject): PartListEntry[] {
+    const metadata = object.metadata as ObjectMetadata | null;
+    return metadata?.parts_list || [];
+  },
+
+  /**
+   * Initialize part list from linked parts (object_lexicon_links)
+   * This populates the part list with all linked parts that have type='part'
+   */
+  async initializePartsListFromLinks(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<PartListEntry[]> {
+    // Get all linked lexicon items for this object
+    const links = await objectLexiconService.getLexiconByObject(supabase, objectId);
+
+    if (links.length === 0) {
+      return [];
+    }
+
+    // Get the full lexicon items
+    const lexiconIds = links.map((l: ObjectLexiconLink) => l.lexicon_id);
+    const lexiconItems = await lexiconService.getLexiconItemsByIds(supabase, lexiconIds);
+
+    // Filter for parts only and create part list entries
+    const partsList: PartListEntry[] = lexiconItems
+      .filter(item => item.type === 'part')
+      .map(item => {
+        const attrs = item.attributes as PartAttributes;
+        return {
+          lexicon_id: item.id,
+          part_number: attrs.part_number,
+          manufacturer: attrs.manufacturer,
+          description: attrs.description,
+          quantity: 1, // Default quantity
+        };
+      });
+
+    return partsList;
+  },
+
+  /**
+   * Update the part list in object metadata
+   */
+  async updatePartsList(
+    supabase: SupabaseClient,
+    objectId: number,
+    partsList: PartListEntry[]
+  ): Promise<ScadaObject> {
+    // Get current object
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    // Update metadata with new parts list
+    const metadata: ObjectMetadata = {
+      ...(currentObject.metadata as ObjectMetadata || {}),
+      parts_list: partsList,
+    };
+
+    // Update the object
+    return await objectService.updateObject(supabase, objectId, { metadata });
+  },
+
+  /**
+   * Add a part to the parts list
+   */
+  async addPart(
+    supabase: SupabaseClient,
+    objectId: number,
+    lexiconId: number,
+    quantity: number = 1
+  ): Promise<ScadaObject> {
+    // Get the part lexicon item
+    const lexiconItem = await lexiconService.getLexiconItem(supabase, lexiconId);
+
+    if (lexiconItem.type !== 'part') {
+      throw new Error('Can only add lexicon items of type "part" to parts list');
+    }
+
+    const attrs = lexiconItem.attributes as PartAttributes;
+
+    // Get current parts list
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+
+    // Check if part already exists
+    const existingIndex = currentParts.findIndex(p => p.lexicon_id === lexiconId);
+
+    let updatedParts: PartListEntry[];
+    if (existingIndex >= 0) {
+      // Update existing quantity
+      updatedParts = [...currentParts];
+      updatedParts[existingIndex] = {
+        ...updatedParts[existingIndex],
+        quantity: updatedParts[existingIndex].quantity + quantity,
+      };
+    } else {
+      // Add new part
+      const newPart: PartListEntry = {
+        lexicon_id: lexiconId,
+        part_number: attrs.part_number,
+        manufacturer: attrs.manufacturer,
+        description: attrs.description,
+        quantity,
+      };
+      updatedParts = [...currentParts, newPart];
+    }
+
+    return await this.updatePartsList(supabase, objectId, updatedParts);
+  },
+
+  /**
+   * Remove a part from the parts list
+   */
+  async removePart(
+    supabase: SupabaseClient,
+    objectId: number,
+    lexiconId: number
+  ): Promise<ScadaObject> {
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+    const updatedParts = currentParts.filter(p => p.lexicon_id !== lexiconId);
+
+    return await this.updatePartsList(supabase, objectId, updatedParts);
+  },
+
+  /**
+   * Update the quantity of a part in the parts list
+   */
+  async updatePartQuantity(
+    supabase: SupabaseClient,
+    objectId: number,
+    lexiconId: number,
+    quantity: number
+  ): Promise<ScadaObject> {
+    if (quantity < 0) {
+      throw new Error('Quantity cannot be negative');
+    }
+
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+    const partIndex = currentParts.findIndex(p => p.lexicon_id === lexiconId);
+
+    if (partIndex === -1) {
+      throw new Error(`Part ${lexiconId} not found in parts list`);
+    }
+
+    const updatedParts = [...currentParts];
+    updatedParts[partIndex] = {
+      ...updatedParts[partIndex],
+      quantity,
+    };
+
+    return await this.updatePartsList(supabase, objectId, updatedParts);
+  },
+
+  /**
+   * Add a manual part (without lexicon connection) to the parts list
+   */
+  async addManualPart(
+    supabase: SupabaseClient,
+    objectId: number,
+    part: Omit<PartListEntry, 'lexicon_id'>
+  ): Promise<ScadaObject> {
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+
+    const newPart: PartListEntry = {
+      lexicon_id: null,
+      ...part,
+    };
+
+    const updatedParts = [...currentParts, newPart];
+    return await this.updatePartsList(supabase, objectId, updatedParts);
+  },
+
+  /**
+   * Update a part by index (for manual parts or editing existing parts)
+   */
+  async updatePartByIndex(
+    supabase: SupabaseClient,
+    objectId: number,
+    index: number,
+    updatedFields: Partial<PartListEntry>
+  ): Promise<ScadaObject> {
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+
+    if (index < 0 || index >= currentParts.length) {
+      throw new Error(`Invalid part index ${index}`);
+    }
+
+    const updatedParts = [...currentParts];
+    updatedParts[index] = {
+      ...updatedParts[index],
+      ...updatedFields,
+    };
+
+    return await this.updatePartsList(supabase, objectId, updatedParts);
+  },
+
+  /**
+   * Remove a part by index (for manual parts or any part)
+   */
+  async removePartByIndex(
+    supabase: SupabaseClient,
+    objectId: number,
+    index: number
+  ): Promise<ScadaObject> {
+    const currentObject = await objectService.getObject(supabase, objectId);
+    if (!currentObject) {
+      throw new Error(`Object ${objectId} not found`);
+    }
+
+    const currentParts = this.getPartsList(currentObject);
+
+    if (index < 0 || index >= currentParts.length) {
+      throw new Error(`Invalid part index ${index}`);
+    }
+
+    const updatedParts = currentParts.filter((_, i) => i !== index);
+    return await this.updatePartsList(supabase, objectId, updatedParts);
   },
 };
 

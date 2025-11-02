@@ -18,6 +18,8 @@ import {
   Settings,
   Trash2,
   Edit3,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { getPriorityColor } from "./constants";
 
@@ -26,6 +28,8 @@ interface ObjectHeaderProps {
   orgUsers: Array<{ userId: string; name: string }>;
   onEdit: () => void;
   onDelete?: () => void;
+  isPartsTableHidden?: boolean;
+  onTogglePartsTable?: () => void;
 }
 
 export function ObjectHeader({
@@ -33,6 +37,8 @@ export function ObjectHeader({
   orgUsers,
   onEdit,
   onDelete,
+  isPartsTableHidden,
+  onTogglePartsTable,
 }: ObjectHeaderProps) {
   return (
     <>
@@ -65,6 +71,21 @@ export function ObjectHeader({
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
+                {onTogglePartsTable && (
+                  <DropdownMenuItem onClick={onTogglePartsTable}>
+                    {isPartsTableHidden ? (
+                      <>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Show Parts Table
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="mr-2 h-4 w-4" />
+                        Hide Parts Table
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-600" onClick={onDelete}>
                   <Trash2 className="mr-2 h-4 w-4" />
