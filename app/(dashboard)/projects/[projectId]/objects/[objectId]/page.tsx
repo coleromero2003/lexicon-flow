@@ -11,11 +11,12 @@ import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ConnectionsCard,
   DescriptionCard,
-  EditObjectSheet,
+  EditObjectDialog,
   FilesCard,
   LexiconCard,
   LinkLexiconDialog,
@@ -77,8 +78,8 @@ export default function ObjectPage() {
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
   const { isGenerating, isMerging, isCompiling, generateAndDownloadReport, mergeAndDownloadPdfs, compileAndDownloadPdfs } = usePdfGeneration();
 
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [editSheetKey, setEditSheetKey] = useState(0);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editDialogKey, setEditDialogKey] = useState(0);
   type EditInitialValues = {
     title: string;
     assignee: string[];
@@ -109,6 +110,9 @@ export default function ObjectPage() {
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
+
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -275,9 +279,9 @@ export default function ObjectPage() {
     [parsedObjectId, supabase]
   );
 
-  const handleOpenEditSheet = () => {
-    setEditSheetKey((key) => key + 1);
-    setIsEditSheetOpen(true);
+  const handleOpenEditDialog = () => {
+    setEditDialogKey((key) => key + 1);
+    setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = async ({
@@ -404,9 +408,42 @@ export default function ObjectPage() {
         return;
       }
 
+      // Show the rename dialog instead of uploading immediately
+      setFileToUpload(file);
+      setIsRenameDialogOpen(true);
+
+      // Clear the input so the same file can be selected again
+      event.target.value = "";
+    },
+    [object]
+  );
+
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      if (!object) {
+        toast.error("Object data is still loading");
+        return;
+      }
+
+      // Show the rename dialog instead of uploading immediately
+      setFileToUpload(file);
+      setIsRenameDialogOpen(true);
+    },
+    [object]
+  );
+
+  const handleConfirmRename = useCallback(
+    async (newFileName: string) => {
+      if (!fileToUpload || !object) return;
+
       try {
+        // Create a new File object with the renamed filename
+        const renamedFile = new File([fileToUpload], newFileName, {
+          type: fileToUpload.type,
+        });
+
         await uploadObjectFile({
-          file,
+          file: renamedFile,
           projectId: parsedProjectId,
           objectId: parsedObjectId,
           objectSlug: object.title,
@@ -420,38 +457,15 @@ export default function ObjectPage() {
           err instanceof Error ? err.message : "Failed to upload file"
         );
       } finally {
-        event.target.value = "";
+        setFileToUpload(null);
       }
     },
-    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+    [fileToUpload, object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
   );
 
-  const handleFileDrop = useCallback(
-    async (file: File) => {
-      if (!object) {
-        toast.error("Object data is still loading");
-        return;
-      }
-
-      try {
-        await uploadObjectFile({
-          file,
-          projectId: parsedProjectId,
-          objectId: parsedObjectId,
-          objectSlug: object.title,
-        });
-
-        await reloadFiles();
-        toast.success("File uploaded");
-      } catch (err) {
-        console.error("Failed to upload file", err);
-        toast.error(
-          err instanceof Error ? err.message : "Failed to upload file"
-        );
-      }
-    },
-    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
-  );
+  const handleCancelRename = useCallback(() => {
+    setFileToUpload(null);
+  }, []);
 
   const handleViewFile = openObjectFile;
 
@@ -662,7 +676,7 @@ export default function ObjectPage() {
             userId,
             name,
           }))}
-          onEdit={handleOpenEditSheet}
+          onEdit={handleOpenEditDialog}
         />
 
         {/* PDF Generation Actions */}
@@ -773,10 +787,10 @@ export default function ObjectPage() {
         </div>
       </main>
 
-      <EditObjectSheet
-        key={editSheetKey}
-        open={isEditSheetOpen}
-        onOpenChange={setIsEditSheetOpen}
+      <EditObjectDialog
+        key={editDialogKey}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
         initialValues={editInitialValues}
         orgUsers={organizationUsers.map(({ userId, name }) => ({
           userId,
@@ -824,6 +838,14 @@ export default function ObjectPage() {
         open={isSubmittalPdfDialogOpen}
         onOpenChange={setIsSubmittalPdfDialogOpen}
         submittalObject={object}
+      />
+
+      <FileRenameDialog
+        open={isRenameDialogOpen}
+        onOpenChange={setIsRenameDialogOpen}
+        originalFileName={fileToUpload?.name ?? ""}
+        onConfirm={handleConfirmRename}
+        onCancel={handleCancelRename}
       />
     </div>
   );

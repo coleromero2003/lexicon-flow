@@ -12,6 +12,7 @@ import { FilesCard } from "@/components/objects/files-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,8 @@ export default function LexiconItemPage() {
   const [isAttributeDialogOpen, setIsAttributeDialogOpen] = useState(false);
   const [newAttributeKey, setNewAttributeKey] = useState("");
   const [newAttributeValue, setNewAttributeValue] = useState("");
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
@@ -132,41 +135,54 @@ export default function LexiconItemPage() {
     const file = event.target.files?.[0];
     if (!file || !supabase || !item) return;
 
-    try {
-      const uploadedFile = await uploadLexiconFile({
-        file,
-        lexiconId,
-        lexiconSlug: item.name,
-      });
-      setFiles((prev) => [...prev, uploadedFile]);
-      toast.success("File uploaded successfully");
+    // Show the rename dialog instead of uploading immediately
+    setFileToUpload(file);
+    setIsRenameDialogOpen(true);
 
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (err) {
-      console.error("Failed to upload file", err);
-      toast.error("Failed to upload file");
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
-  }, [supabase, item, lexiconId, uploadLexiconFile]);
+  }, [supabase, item]);
 
   const handleFileDrop = useCallback(async (file: File) => {
     if (!supabase || !item) return;
 
-    try {
-      const uploadedFile = await uploadLexiconFile({
-        file,
-        lexiconId,
-        lexiconSlug: item.name,
-      });
-      setFiles((prev) => [...prev, uploadedFile]);
-      toast.success("File uploaded successfully");
-    } catch (err) {
-      console.error("Failed to upload file", err);
-      toast.error("Failed to upload file");
-    }
-  }, [supabase, item, lexiconId, uploadLexiconFile]);
+    // Show the rename dialog instead of uploading immediately
+    setFileToUpload(file);
+    setIsRenameDialogOpen(true);
+  }, [supabase, item]);
+
+  const handleConfirmRename = useCallback(
+    async (newFileName: string) => {
+      if (!fileToUpload || !item) return;
+
+      try {
+        // Create a new File object with the renamed filename
+        const renamedFile = new File([fileToUpload], newFileName, {
+          type: fileToUpload.type,
+        });
+
+        const uploadedFile = await uploadLexiconFile({
+          file: renamedFile,
+          lexiconId,
+          lexiconSlug: item.name,
+        });
+        setFiles((prev) => [...prev, uploadedFile]);
+        toast.success("File uploaded successfully");
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        toast.error("Failed to upload file");
+      } finally {
+        setFileToUpload(null);
+      }
+    },
+    [fileToUpload, item, lexiconId, uploadLexiconFile]
+  );
+
+  const handleCancelRename = useCallback(() => {
+    setFileToUpload(null);
+  }, []);
 
   const handleFileDelete = useCallback(async (fileId: number) => {
     if (!supabase) return;
@@ -525,6 +541,14 @@ export default function LexiconItemPage() {
         file={viewerFile}
         url={viewerUrl}
         loading={viewerLoading}
+      />
+
+      <FileRenameDialog
+        open={isRenameDialogOpen}
+        onOpenChange={setIsRenameDialogOpen}
+        originalFileName={fileToUpload?.name ?? ""}
+        onConfirm={handleConfirmRename}
+        onCancel={handleCancelRename}
       />
     </div>
   );

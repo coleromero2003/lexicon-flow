@@ -110,9 +110,7 @@ export function DynamicBreadcrumb() {
 
   // Build breadcrumb segments
   const breadcrumbs = useMemo(() => {
-    const segments: BreadcrumbSegment[] = [
-      { label: "Home", href: "/" },
-    ];
+    const segments: BreadcrumbSegment[] = [];
 
     let currentPath = "";
 
@@ -168,8 +166,8 @@ export function DynamicBreadcrumb() {
     return segments;
   }, [pathSegments, entityNames]);
 
-  // Don't render breadcrumbs on home page
-  if (pathname === "/" || breadcrumbs.length <= 1) {
+  // Don't render breadcrumbs on home page or if no segments
+  if (pathname === "/" || breadcrumbs.length === 0) {
     return null;
   }
 
