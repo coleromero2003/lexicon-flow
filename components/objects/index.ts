@@ -1,5 +1,5 @@
 export { ObjectHeader } from "./object-header";
-export { EditObjectSheet } from "./edit-object-sheet";
+export { EditObjectDialog } from "./edit-object-dialog";
 export { DescriptionCard } from "./description-card";
 export { WorkflowsCard } from "./workflows-card";
 export { SubtasksCard } from "./subtasks-card";

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useAuth } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
@@ -11,18 +11,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PriorityBadge } from "@/components/ui/priority-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
 import { FileMeta, Project, ScadaObject, Workflow } from "@/lib/supabase/models";
 import { formatFileSize } from "@/lib/utils/format-file-size";
+import { toast } from "sonner";
 import {
   FolderKanban,
   LayoutDashboard,
   ListTree,
+  MoreVertical,
+  Pencil,
   Search,
   Share2,
+  Trash2,
   Workflow as WorkflowIcon,
 } from "lucide-react";
 
@@ -33,7 +41,11 @@ export default function ProjectDashboardPage() {
   const router = useRouter();
   const projectIdNum = Number(projectId);
   const { organization } = useOrganization();
+  const { has } = useAuth();
   const { supabase } = useSupabase();
+
+  // Check if user has admin role in the organization
+  const isAdmin = has?.({ role: "admin" }) ?? false;
 
   const [project, setProject] = useState<Project | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -42,6 +54,22 @@ export default function ProjectDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Dialog states
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Form state for editing
+  const [editForm, setEditForm] = useState({
+    name: "",
+    code: "",
+    description: "",
+    status: "",
+    start_date: "",
+    end_date: "",
+  });
 
   useEffect(() => {
     if (!supabase || !organization || Number.isNaN(projectIdNum)) {
@@ -120,6 +148,81 @@ export default function ProjectDashboardPage() {
   const overflowWorkflows = filteredWorkflows.slice(MAX_WORKFLOWS_IN_ROW);
 
   const hasSearch = normalizedQuery.length > 0;
+
+  // Handler to open edit dialog and populate form
+  const handleOpenEditDialog = () => {
+    if (!project) return;
+    setEditForm({
+      name: project.name,
+      code: project.code || "",
+      description: project.description || "",
+      status: project.status || "",
+      start_date: project.start_date || "",
+      end_date: project.end_date || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Handler to update project
+  const handleUpdateProject = async () => {
+    if (!supabase || !project) return;
+
+    try {
+      setIsUpdating(true);
+      const updates: Partial<Project> = {
+        name: editForm.name,
+        code: editForm.code || null,
+        description: editForm.description || null,
+        status: editForm.status,
+        start_date: editForm.start_date || null,
+        end_date: editForm.end_date || null,
+      };
+
+      const updatedProject = await projectService.updateProject(
+        supabase,
+        projectIdNum,
+        updates
+      );
+
+      setProject(updatedProject);
+      setEditDialogOpen(false);
+      toast.success("Project updated successfully");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update project"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Handler to delete project
+  const handleDeleteProject = async () => {
+    if (!supabase) return;
+
+    // Additional check: Only admins can delete projects
+    if (!isAdmin) {
+      toast.error("Only administrators can delete projects");
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      await projectService.deleteProject(supabase, projectIdNum);
+
+      toast.success("Project deleted successfully");
+
+      // Navigate back to dashboard after deletion
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete project"
+      );
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   function renderLoadingState() {
     return (
@@ -208,6 +311,30 @@ export default function ProjectDashboardPage() {
             >
               <Share2 className="h-4 w-4" /> Graph view
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleOpenEditDialog}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Project
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Project
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -443,6 +570,108 @@ export default function ProjectDashboardPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+            <DialogDescription>
+              Update the project properties below. All fields except name are optional.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Project Name *</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Enter project name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-code">Project Code</Label>
+              <Input
+                id="edit-code"
+                value={editForm.code}
+                onChange={(e) => setEditForm({ ...editForm, code: e.target.value })}
+                placeholder="e.g., PROJ-001"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                placeholder="Enter project description"
+                rows={3}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <Input
+                id="edit-status"
+                value={editForm.status}
+                onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                placeholder="e.g., Planning, Active, Completed"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-start-date">Start Date</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={editForm.start_date}
+                  onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-end-date">End Date</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={editForm.end_date}
+                  onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={isUpdating}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateProject} disabled={isUpdating || !editForm.name.trim()}>
+              {isUpdating ? "Updating..." : "Update Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the project <strong>{project.name}</strong> and all associated
+              workflows, objects, and files. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete Project"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

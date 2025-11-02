@@ -47,6 +47,10 @@ type FormState = {
   type: LexiconType;
   notes: string;
   version: number;
+  // Part-specific required fields
+  part_number: string;
+  manufacturer: string;
+  description: string;
 };
 
 const defaultType: LexiconType = "part";
@@ -56,6 +60,9 @@ const createInitialFormState = (): FormState => ({
   type: defaultType,
   notes: "",
   version: 1,
+  part_number: "",
+  manufacturer: "",
+  description: "",
 });
 
 export default function LexiconPage() {
@@ -176,11 +183,37 @@ export default function LexiconPage() {
       return;
     }
 
+    // Validate part-specific required fields
+    if (formState.type === "part") {
+      if (!formState.part_number.trim()) {
+        toast.error("Part number is required for parts");
+        return;
+      }
+      if (!formState.manufacturer.trim()) {
+        toast.error("Manufacturer is required for parts");
+        return;
+      }
+      if (!formState.description.trim()) {
+        toast.error("Description is required for parts");
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
-      const attributes = formState.notes.trim()
-        ? { notes: formState.notes.trim() }
-        : {};
+
+      // Build attributes based on type
+      const attributes: Record<string, unknown> = {};
+
+      if (formState.type === "part") {
+        attributes.part_number = formState.part_number.trim();
+        attributes.manufacturer = formState.manufacturer.trim();
+        attributes.description = formState.description.trim();
+      }
+
+      if (formState.notes.trim()) {
+        attributes.notes = formState.notes.trim();
+      }
 
       const newItem = await lexiconService.createLexiconItem(supabase, {
         org_id: organization.id,
@@ -327,8 +360,67 @@ export default function LexiconPage() {
                       </Select>
                     </div>
 
+                    {/* Part-specific required fields */}
+                    {formState.type === "part" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="part-number">
+                            Part Number <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="part-number"
+                            value={formState.part_number}
+                            onChange={(event) =>
+                              setFormState((prev) => ({
+                                ...prev,
+                                part_number: event.target.value,
+                              }))
+                            }
+                            placeholder="e.g. 1234-5678"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="manufacturer">
+                            Manufacturer <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="manufacturer"
+                            value={formState.manufacturer}
+                            onChange={(event) =>
+                              setFormState((prev) => ({
+                                ...prev,
+                                manufacturer: event.target.value,
+                              }))
+                            }
+                            placeholder="e.g. Allen-Bradley"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="part-description">
+                            Description <span className="text-red-500">*</span>
+                          </Label>
+                          <Textarea
+                            id="part-description"
+                            value={formState.description}
+                            onChange={(event) =>
+                              setFormState((prev) => ({
+                                ...prev,
+                                description: event.target.value,
+                              }))
+                            }
+                            placeholder="Brief description of the part"
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
                     <div className="space-y-2">
-                      <Label htmlFor="lexicon-notes">Notes</Label>
+                      <Label htmlFor="lexicon-notes">Notes (Optional)</Label>
                       <Textarea
                         id="lexicon-notes"
                         value={formState.notes}

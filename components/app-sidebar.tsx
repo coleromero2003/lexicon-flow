@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useOrganization, UserButton, useUser } from "@clerk/nextjs";
 import {
   Building2,
@@ -11,8 +11,6 @@ import {
   Box,
   Network,
   FileText,
-  ArrowLeft,
-  ArrowRight,
   LayoutDashboard,
   Library,
 } from "lucide-react";
@@ -34,7 +32,6 @@ import { useState, useEffect } from "react";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { organization } = useOrganization();
   const { user } = useUser();
   const { projects } = useProjects();
@@ -54,9 +51,6 @@ export function AppSidebar() {
   const selectedProject = selectedProjectId
     ? projects.find((p) => p.id === selectedProjectId)
     : null;
-
-  const handleBack = () => router.back();
-  const handleForward = () => router.forward();
 
   return (
     <Sidebar collapsible="icon">
@@ -113,26 +107,16 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleBack} tooltip="Go Back">
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Back</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleForward} tooltip="Go Forward">
-                  <ArrowRight className="h-4 w-4" />
-                  <span>Forward</span>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/projects" || (pathname.startsWith("/projects/") && !selectedProjectId)}
+                  tooltip="All Projects"
+                >
+                  <Link href="/dashboard">
+                    <FolderKanban />
+                    <span>Projects</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

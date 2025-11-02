@@ -300,10 +300,10 @@ function ProjectsPageContent() {
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                Projects for {organization.name}
+                Dashboard for {organization.name}
               </h1>
               <p className="text-gray-600">
-                Manage your SCADA projects and workflows.
+                Overview your SCADA projects and workflows.
               </p>
             </div>
             <Link href="/lexicon">
