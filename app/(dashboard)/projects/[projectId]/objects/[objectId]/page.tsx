@@ -5,9 +5,10 @@ import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { FileText, FileCheck } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -103,6 +104,8 @@ export default function ObjectPage() {
   const [availableLexiconItems, setAvailableLexiconItems] = useState<LexiconItem[]>([]);
   const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
   const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
+
+  const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] = useState(false);
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
@@ -697,6 +700,14 @@ export default function ObjectPage() {
             <FileText className="h-4 w-4 mr-2" />
             {isCompiling ? "Compiling..." : "Compile All PDFs"}
           </Button>
+
+          <Button
+            onClick={() => setIsSubmittalPdfDialogOpen(true)}
+            variant="outline"
+          >
+            <FileCheck className="h-4 w-4 mr-2" />
+            Generate Submittal PDF
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
@@ -807,6 +818,12 @@ export default function ObjectPage() {
         file={viewerFile}
         url={viewerUrl}
         loading={viewerLoading}
+      />
+
+      <SubmittalPDFDialog
+        open={isSubmittalPdfDialogOpen}
+        onOpenChange={setIsSubmittalPdfDialogOpen}
+        submittalObject={object}
       />
     </div>
   );
