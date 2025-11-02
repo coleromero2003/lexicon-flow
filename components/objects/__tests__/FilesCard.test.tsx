@@ -234,4 +234,47 @@ describe("FilesCard", () => {
 
     expect(getFileRow().querySelector(".animate-spin")).not.toBeNull();
   });
+
+  it("displays appropriate icons for different file types", () => {
+    const pdfFile: FileMeta = {
+      ...mockFile,
+      id: 1,
+      filename: "document.pdf",
+      mime_type: "application/pdf",
+    };
+
+    const excelFile: FileMeta = {
+      ...mockFile,
+      id: 2,
+      filename: "spreadsheet.xlsx",
+      mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+
+    const imageFile: FileMeta = {
+      ...mockFile,
+      id: 3,
+      filename: "photo.png",
+      mime_type: "image/png",
+    };
+
+    const otherFile: FileMeta = {
+      ...mockFile,
+      id: 4,
+      filename: "archive.zip",
+      mime_type: "application/zip",
+    };
+
+    render(
+      <FilesCard
+        files={[pdfFile, excelFile, imageFile, otherFile]}
+        onView={vi.fn()}
+      />
+    );
+
+    // All files should be displayed
+    expect(screen.getByText("document.pdf")).toBeInTheDocument();
+    expect(screen.getByText("spreadsheet.xlsx")).toBeInTheDocument();
+    expect(screen.getByText("photo.png")).toBeInTheDocument();
+    expect(screen.getByText("archive.zip")).toBeInTheDocument();
+  });
 });

@@ -91,10 +91,21 @@ export const useSupabaseFileViewer = ({
       const mimeType = (file.mime_type ?? "").toLowerCase();
       const fileName = file.filename.toLowerCase();
       const isPdf = mimeType.includes("pdf") || fileName.endsWith(".pdf");
+      const isImage =
+        mimeType.includes("image") ||
+        fileName.endsWith(".png") ||
+        fileName.endsWith(".jpg") ||
+        fileName.endsWith(".jpeg") ||
+        fileName.endsWith(".gif") ||
+        fileName.endsWith(".webp") ||
+        fileName.endsWith(".svg") ||
+        fileName.endsWith(".bmp");
+
+      const canPreview = isPdf || isImage;
 
       setViewingFileId(file.id);
 
-      if (isPdf) {
+      if (canPreview) {
         setIsViewerOpen(true);
         setViewerFile(file);
         setViewerUrl(null);
@@ -110,19 +121,19 @@ export const useSupabaseFileViewer = ({
           throw error ?? new Error("Unable to generate file link");
         }
 
-        if (isPdf) {
+        if (canPreview) {
           setViewerUrl(data.signedUrl);
         } else if (typeof window !== "undefined") {
           window.open(data.signedUrl, "_blank", "noopener,noreferrer");
         }
       } catch (error) {
         handleError(error);
-        if (isPdf) {
+        if (canPreview) {
           resetViewer();
         }
       } finally {
         setViewingFileId(null);
-        if (isPdf) {
+        if (canPreview) {
           setViewerLoading(false);
         }
       }
