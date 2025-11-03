@@ -8,18 +8,21 @@ import { toast } from "sonner";
 import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ConnectionsCard,
   DescriptionCard,
-  EditObjectSheet,
+  EditObjectDialog,
   FilesCard,
   LexiconCard,
   LinkLexiconDialog,
   LinkObjectDialog,
   ObjectHeader,
+  // PdfSelectionDialog, // Hidden until feature is complete
   PropertiesCard,
   SubtasksCard,
   WorkflowsCard,
@@ -27,6 +30,8 @@ import {
   RELATION_KIND_OPTIONS,
 } from "@/components/objects";
 import type { PriorityValue } from "@/components/objects";
+import { PartsListCard } from "@/components/objects/parts-list-card";
+import { partListService } from "@/lib/services";
 import { useObject } from "@/lib/hooks/useObjects";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { useSubtasks } from "@/lib/hooks/useSubtasks";
@@ -36,7 +41,7 @@ import { useObjectLexicon } from "@/lib/hooks/useObjectLexicon";
 import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
-import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
+// import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration"; // Hidden until PDF feature is complete
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, workflowService } from "@/lib/services";
 import type {
@@ -45,7 +50,6 @@ import type {
   ScadaObject,
   Workflow,
 } from "@/lib/supabase/models";
-import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -60,7 +64,8 @@ export default function ObjectPage() {
   const { supabase } = useSupabase();
   const { organization } = useOrganization();
 
-  const { object, loading, error, updateObject } = useObject(parsedObjectId);
+  const { object, loading, error, updateObject, reloadObject } =
+    useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
   const {
     files: objectFiles,
@@ -74,10 +79,18 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
-  const { isGenerating, isMerging, isCompiling, generateAndDownloadReport, mergeAndDownloadPdfs, compileAndDownloadPdfs } = usePdfGeneration();
+  // PDF generation hook - Hidden until feature is complete
+  // const {
+  //   isGenerating,
+  //   isMerging,
+  //   isCompiling,
+  //   generateAndDownloadReport,
+  //   mergeAndDownloadPdfs,
+  //   compileAndDownloadPdfs,
+  // } = usePdfGeneration();
 
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [editSheetKey, setEditSheetKey] = useState(0);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editDialogKey, setEditDialogKey] = useState(0);
   type EditInitialValues = {
     title: string;
     assignee: string[];
@@ -100,12 +113,23 @@ export default function ObjectPage() {
   const [isLinkingObject, setIsLinkingObject] = useState(false);
 
   const [isLexiconDialogOpen, setIsLexiconDialogOpen] = useState(false);
-  const [availableLexiconItems, setAvailableLexiconItems] = useState<LexiconItem[]>([]);
+  const [availableLexiconItems, setAvailableLexiconItems] = useState<
+    LexiconItem[]
+  >([]);
   const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
   const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
 
+  const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] =
+    useState(false);
+  // PDF selection dialog state - Hidden until feature is complete
+  // const [isPdfSelectionDialogOpen, setIsPdfSelectionDialogOpen] =
+  //   useState(false);
+
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
+
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -185,10 +209,7 @@ export default function ObjectPage() {
     }
   }, [isLexiconDialogOpen, loadAvailableLexiconItems]);
 
-  const storageBucket = useMemo(
-    () => "lexicon-files",
-    []
-  );
+  const storageBucket = useMemo(() => "lexicon-files", []);
 
   const linkedObjectIds = useMemo(
     () => relationsHook.relations.map((relation) => relation.relatedObject.id),
@@ -272,9 +293,9 @@ export default function ObjectPage() {
     [parsedObjectId, supabase]
   );
 
-  const handleOpenEditSheet = () => {
-    setEditSheetKey((key) => key + 1);
-    setIsEditSheetOpen(true);
+  const handleOpenEditDialog = () => {
+    setEditDialogKey((key) => key + 1);
+    setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = async ({
@@ -353,12 +374,43 @@ export default function ObjectPage() {
 
   const handleMetadataUpdate = async (metadata: Record<string, unknown>) => {
     try {
-      await updateObject({ metadata });
+      // Preserve parts_list and parts_table_hidden when updating other metadata
+      const currentMetadata = object?.metadata || {};
+      const { parts_list, parts_table_hidden } = currentMetadata as {
+        parts_list?: unknown;
+        parts_table_hidden?: boolean;
+      };
+const updatedMetadata = {
+  ...metadata,
+  ...(parts_list !== undefined && !('parts_list' in metadata) && { parts_list }),
+  ...(parts_table_hidden !== undefined &&
+    !('parts_table_hidden' in metadata) && { parts_table_hidden }),
+};
+      await updateObject({ metadata: updatedMetadata });
       toast.success("Properties updated");
     } catch (err) {
       console.error("Failed to update properties", err);
       toast.error("Failed to update properties");
       throw err;
+    }
+  };
+
+  const handleTogglePartsTableVisibility = async () => {
+    if (!object) return;
+
+    const currentMetadata = object.metadata || {};
+    const isCurrentlyHidden =
+      (currentMetadata as { parts_table_hidden?: boolean })
+        .parts_table_hidden || false;
+
+    try {
+      await handleMetadataUpdate({
+        ...currentMetadata,
+        parts_table_hidden: !isCurrentlyHidden,
+      });
+    } catch (err) {
+      console.error("Failed to toggle parts table visibility", err);
+      toast.error("Failed to toggle parts table visibility");
     }
   };
 
@@ -401,9 +453,42 @@ export default function ObjectPage() {
         return;
       }
 
+      // Show the rename dialog instead of uploading immediately
+      setFileToUpload(file);
+      setIsRenameDialogOpen(true);
+
+      // Clear the input so the same file can be selected again
+      event.target.value = "";
+    },
+    [object]
+  );
+
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      if (!object) {
+        toast.error("Object data is still loading");
+        return;
+      }
+
+      // Show the rename dialog instead of uploading immediately
+      setFileToUpload(file);
+      setIsRenameDialogOpen(true);
+    },
+    [object]
+  );
+
+  const handleConfirmRename = useCallback(
+    async (newFileName: string) => {
+      if (!fileToUpload || !object) return;
+
       try {
+        // Create a new File object with the renamed filename
+        const renamedFile = new File([fileToUpload], newFileName, {
+          type: fileToUpload.type,
+        });
+
         await uploadObjectFile({
-          file,
+          file: renamedFile,
           projectId: parsedProjectId,
           objectId: parsedObjectId,
           objectSlug: object.title,
@@ -417,38 +502,22 @@ export default function ObjectPage() {
           err instanceof Error ? err.message : "Failed to upload file"
         );
       } finally {
-        event.target.value = "";
+        setFileToUpload(null);
       }
     },
-    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
+    [
+      fileToUpload,
+      object,
+      parsedObjectId,
+      parsedProjectId,
+      reloadFiles,
+      uploadObjectFile,
+    ]
   );
 
-  const handleFileDrop = useCallback(
-    async (file: File) => {
-      if (!object) {
-        toast.error("Object data is still loading");
-        return;
-      }
-
-      try {
-        await uploadObjectFile({
-          file,
-          projectId: parsedProjectId,
-          objectId: parsedObjectId,
-          objectSlug: object.title,
-        });
-
-        await reloadFiles();
-        toast.success("File uploaded");
-      } catch (err) {
-        console.error("Failed to upload file", err);
-        toast.error(
-          err instanceof Error ? err.message : "Failed to upload file"
-        );
-      }
-    },
-    [object, parsedObjectId, parsedProjectId, reloadFiles, uploadObjectFile]
-  );
+  const handleCancelRename = useCallback(() => {
+    setFileToUpload(null);
+  }, []);
 
   const handleViewFile = openObjectFile;
 
@@ -543,7 +612,11 @@ export default function ObjectPage() {
       const updatedMetadata = { ...currentMetadata, ...attributes };
 
       await handleMetadataUpdate(updatedMetadata);
-      toast.success(`Inherited ${Object.keys(attributes).length} properties from lexicon item`);
+      toast.success(
+        `Inherited ${
+          Object.keys(attributes).length
+        } properties from lexicon item`
+      );
     } catch (err) {
       console.error("Failed to inherit lexicon properties", err);
       toast.error("Failed to inherit properties");
@@ -600,6 +673,40 @@ export default function ObjectPage() {
     }
   };
 
+  // PDF type selection handler - Hidden until feature is complete
+  // const handlePdfTypeSelection = useCallback(
+  //   (type: "purchase-report" | "merge-pdfs" | "compile-pdfs" | "submittal-pdf") => {
+  //     if (!object) return;
+  //
+  //     switch (type) {
+  //       case "purchase-report":
+  //         generateAndDownloadReport(parsedObjectId, object.title);
+  //         break;
+  //       case "merge-pdfs": {
+  //         const pdfFileIds = objectFiles
+  //           .filter((f) => f.mime_type === "application/pdf")
+  //           .map((f) => f.id);
+  //         mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
+  //         break;
+  //       }
+  //       case "compile-pdfs":
+  //         compileAndDownloadPdfs(parsedObjectId, object.title);
+  //         break;
+  //       case "submittal-pdf":
+  //         setIsSubmittalPdfDialogOpen(true);
+  //         break;
+  //     }
+  //   },
+  //   [
+  //     object,
+  //     parsedObjectId,
+  //     objectFiles,
+  //     generateAndDownloadReport,
+  //     mergeAndDownloadPdfs,
+  //     compileAndDownloadPdfs,
+  //   ]
+  // );
+
   if (loading || subtasksHook.loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -631,7 +738,10 @@ export default function ObjectPage() {
               "The object you&rsquo;re looking for doesn&rsquo;t exist or has been deleted."
             }
             action={
-              <Button variant="outline" onClick={() => router.push(`/projects/${projectId}/objects`)}>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/projects/${projectId}/objects`)}
+              >
                 Go Back
               </Button>
             }
@@ -643,7 +753,6 @@ export default function ObjectPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
       <input
         ref={fileInputRef}
         type="file"
@@ -652,52 +761,33 @@ export default function ObjectPage() {
       />
 
       <main className="container mx-auto px-4 py-6 sm:py-8">
-
         <ObjectHeader
           object={object}
           orgUsers={organizationUsers.map(({ userId, name }) => ({
             userId,
             name,
           }))}
-          onEdit={handleOpenEditSheet}
+          onEdit={handleOpenEditDialog}
+          isPartsTableHidden={
+            (object.metadata as { parts_table_hidden?: boolean })
+              ?.parts_table_hidden || false
+          }
+          onTogglePartsTable={handleTogglePartsTableVisibility}
         />
 
-        {/* PDF Generation Actions */}
-        <div className="flex gap-2 mb-4 flex-wrap">
+        {/* PDF Generation Actions - Hidden until feature is complete */}
+        {/* <div className="flex gap-2 mb-4 flex-wrap">
           <Button
-            onClick={() => generateAndDownloadReport(parsedObjectId, object.title)}
-            disabled={isGenerating}
-            variant="outline"
-          >
-            <FileDown className="h-4 w-4 mr-2" />
-            {isGenerating ? "Generating..." : "Generate Purchase Report"}
-          </Button>
-
-          {objectFiles.filter(f => f.mime_type === "application/pdf").length > 1 && (
-            <Button
-              onClick={() => {
-                const pdfFileIds = objectFiles
-                  .filter(f => f.mime_type === "application/pdf")
-                  .map(f => f.id);
-                mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
-              }}
-              disabled={isMerging}
-              variant="outline"
-            >
-              <FilePlus2 className="h-4 w-4 mr-2" />
-              {isMerging ? "Merging..." : `Merge ${objectFiles.filter(f => f.mime_type === "application/pdf").length} PDFs`}
-            </Button>
-          )}
-
-          <Button
-            onClick={() => compileAndDownloadPdfs(parsedObjectId, object.title)}
-            disabled={isCompiling}
+            onClick={() => setIsPdfSelectionDialogOpen(true)}
+            disabled={isGenerating || isMerging || isCompiling}
             variant="outline"
           >
             <FileText className="h-4 w-4 mr-2" />
-            {isCompiling ? "Compiling..." : "Compile All PDFs"}
+            {isGenerating || isMerging || isCompiling
+              ? "Processing..."
+              : "Generate PDF"}
           </Button>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
           <div className="space-y-6">
@@ -723,6 +813,15 @@ export default function ObjectPage() {
               onReorder={handleReorderSubtasks}
             />
 
+            {!(object.metadata as { parts_table_hidden?: boolean })
+              ?.parts_table_hidden && (
+              <PartsListCard
+                objectId={parsedObjectId}
+                parts={partListService.getPartsList(object)}
+                onUpdate={reloadObject}
+              />
+            )}
+
             <FilesCard
               files={objectFiles}
               onUpload={handleUploadClick}
@@ -737,7 +836,12 @@ export default function ObjectPage() {
 
           <div className="space-y-6">
             <PropertiesCard
-              metadata={object.metadata || {}}
+              metadata={(() => {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { parts_list, parts_table_hidden, ...rest } =
+                  object.metadata || {};
+                return rest;
+              })()}
               suggestions={metadataSuggestions}
               onUpdate={handleMetadataUpdate}
             />
@@ -762,10 +866,10 @@ export default function ObjectPage() {
         </div>
       </main>
 
-      <EditObjectSheet
-        key={editSheetKey}
-        open={isEditSheetOpen}
-        onOpenChange={setIsEditSheetOpen}
+      <EditObjectDialog
+        key={editDialogKey}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
         initialValues={editInitialValues}
         orgUsers={organizationUsers.map(({ userId, name }) => ({
           userId,
@@ -807,6 +911,28 @@ export default function ObjectPage() {
         file={viewerFile}
         url={viewerUrl}
         loading={viewerLoading}
+      />
+
+      <SubmittalPDFDialog
+        open={isSubmittalPdfDialogOpen}
+        onOpenChange={setIsSubmittalPdfDialogOpen}
+        submittalObject={object}
+      />
+
+      {/* PDF Selection Dialog - Hidden until feature is complete */}
+      {/* <PdfSelectionDialog
+        open={isPdfSelectionDialogOpen}
+        onOpenChange={setIsPdfSelectionDialogOpen}
+        onSelect={handlePdfTypeSelection}
+        pdfCount={objectFiles.filter((f) => f.mime_type === "application/pdf").length}
+      /> */}
+
+      <FileRenameDialog
+        open={isRenameDialogOpen}
+        onOpenChange={setIsRenameDialogOpen}
+        originalFileName={fileToUpload?.name ?? ""}
+        onConfirm={handleConfirmRename}
+        onCancel={handleCancelRename}
       />
     </div>
   );

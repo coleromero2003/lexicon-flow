@@ -1,5 +1,5 @@
 export { ObjectHeader } from "./object-header";
-export { EditObjectSheet } from "./edit-object-sheet";
+export { EditObjectDialog } from "./edit-object-dialog";
 export { DescriptionCard } from "./description-card";
 export { WorkflowsCard } from "./workflows-card";
 export { SubtasksCard } from "./subtasks-card";
@@ -9,5 +9,6 @@ export { ConnectionsCard } from "./connections-card";
 export { LexiconCard } from "./lexicon-card";
 export { LinkObjectDialog } from "./link-object-dialog";
 export { LinkLexiconDialog } from "./link-lexicon-dialog";
+export { PdfSelectionDialog } from "./pdf-selection-dialog";
 export { PRIORITIES, RELATION_KIND_OPTIONS, getPriorityColor } from "./constants";
 export type { PriorityValue } from "./constants";

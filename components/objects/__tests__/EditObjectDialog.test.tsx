@@ -8,22 +8,22 @@ import { describe, it, expect, vi } from "vitest";
 
 const mockNewDueDate = new Date(2024, 2, 10);
 
-vi.mock("@/components/ui/sheet", () => {
+vi.mock("@/components/ui/dialog", () => {
   const React = require("react");
   return {
-    Sheet: ({ children }: React.PropsWithChildren<{ open: boolean }>) => (
-      <div data-testid="sheet">{children}</div>
+    Dialog: ({ children }: React.PropsWithChildren<{ open: boolean }>) => (
+      <div data-testid="dialog">{children}</div>
     ),
-    SheetContent: ({ children }: React.PropsWithChildren) => (
-      <div data-testid="sheet-content">{children}</div>
+    DialogContent: ({ children }: React.PropsWithChildren) => (
+      <div data-testid="dialog-content">{children}</div>
     ),
-    SheetHeader: ({ children }: React.PropsWithChildren) => (
-      <div data-testid="sheet-header">{children}</div>
+    DialogHeader: ({ children }: React.PropsWithChildren) => (
+      <div data-testid="dialog-header">{children}</div>
     ),
-    SheetTitle: ({ children }: React.PropsWithChildren) => (
+    DialogTitle: ({ children }: React.PropsWithChildren) => (
       <h2>{children}</h2>
     ),
-    SheetDescription: ({ children }: React.PropsWithChildren) => (
+    DialogDescription: ({ children }: React.PropsWithChildren) => (
       <p>{children}</p>
     ),
   };
@@ -127,9 +127,9 @@ vi.mock("@/components/ui/calendar", () => {
   };
 });
 
-import { EditObjectSheet } from "../edit-object-sheet";
+import { EditObjectDialog } from "../edit-object-dialog";
 
-describe("EditObjectSheet", () => {
+describe("EditObjectDialog", () => {
   const orgUsers = [
     { userId: "user-1", name: "Alice Johnson" },
     { userId: "user-2", name: "Bob Smith" },
@@ -137,7 +137,7 @@ describe("EditObjectSheet", () => {
 
   const initialValues = {
     title: "Initial Title",
-    assignee: "user-1",
+    assignee: ["user-1"],
     dueDate: new Date(2024, 1, 15),
     priority: "medium",
   };
@@ -148,7 +148,7 @@ describe("EditObjectSheet", () => {
     const onOpenChange = vi.fn();
 
     render(
-      <EditObjectSheet
+      <EditObjectDialog
         open
         onOpenChange={onOpenChange}
         onSave={onSave}
@@ -167,7 +167,10 @@ describe("EditObjectSheet", () => {
     await user.clear(screen.getByLabelText(/title/i));
     await user.type(screen.getByLabelText(/title/i), "Updated Title");
 
-    await user.click(screen.getByText("Bob Smith"));
+    // Click the remove button for Alice to deselect her first
+    await user.click(screen.getByLabelText("Remove Alice Johnson"));
+
+    await user.click(screen.getAllByText("Bob Smith")[0]);
     expect(assigneeTrigger).toHaveTextContent("Bob Smith");
 
     await user.click(screen.getByTestId("calendar"));
@@ -182,7 +185,7 @@ describe("EditObjectSheet", () => {
 
     expect(onSave).toHaveBeenCalledWith({
       title: "Updated Title",
-      assignee: "user-2",
+      assignee: ["user-2"],
       dueDate: mockNewDueDate,
       priority: "high",
     });
@@ -198,7 +201,7 @@ describe("EditObjectSheet", () => {
     const onOpenChange = vi.fn();
 
     render(
-      <EditObjectSheet
+      <EditObjectDialog
         open
         onOpenChange={onOpenChange}
         onSave={onSave}

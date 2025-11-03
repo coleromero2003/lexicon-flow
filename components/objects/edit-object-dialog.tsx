@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ import { format } from "date-fns";
 import { PRIORITIES } from "./constants";
 import { OrganizationUserCombobox } from "@/components/people/organization-user-combobox";
 
-interface EditObjectSheetProps {
+interface EditObjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialValues: {
@@ -47,13 +47,13 @@ interface EditObjectSheetProps {
   }) => Promise<void>;
 }
 
-export function EditObjectSheet({
+export function EditObjectDialog({
   open,
   onOpenChange,
   initialValues,
   orgUsers,
   onSave,
-}: EditObjectSheetProps) {
+}: EditObjectDialogProps) {
   const [editForm, setEditForm] = useState(initialValues);
   const [dueDateOpen, setDueDateOpen] = useState(false);
 
@@ -63,15 +63,15 @@ export function EditObjectSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Edit Object</SheetTitle>
-          <SheetDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Edit Object</DialogTitle>
+          <DialogDescription>
             Make changes to your object details here.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4 mt-6">
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input
@@ -166,7 +166,7 @@ export function EditObjectSheet({
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

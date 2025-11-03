@@ -99,4 +99,49 @@ describe("PdfViewerDialog", () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("renders an img element for image files instead of iframe", () => {
+    const file = createFileMeta({
+      filename: "photo.png",
+      mime_type: "image/png",
+    });
+    const url = "https://example.com/photo.png";
+
+    render(
+      <PdfViewerDialog
+        open
+        onOpenChange={vi.fn()}
+        file={file}
+        url={url}
+        loading={false}
+      />
+    );
+
+    const img = screen.getByAltText("photo.png");
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute("src", url);
+    expect(document.body.querySelector("iframe")).not.toBeInTheDocument();
+  });
+
+  it("detects image files by file extension when mime type is not available", () => {
+    const file = createFileMeta({
+      filename: "photo.jpg",
+      mime_type: null,
+    });
+    const url = "https://example.com/photo.jpg";
+
+    render(
+      <PdfViewerDialog
+        open
+        onOpenChange={vi.fn()}
+        file={file}
+        url={url}
+        loading={false}
+      />
+    );
+
+    const img = screen.getByAltText("photo.jpg");
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute("src", url);
+  });
 });

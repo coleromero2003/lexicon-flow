@@ -102,9 +102,44 @@ describe("useSupabaseFileViewer", () => {
     });
   });
 
-  it("opens non-PDF files in a new tab", async () => {
+  it("opens image files in the in-app viewer like PDFs", async () => {
     const supabase = createSupabaseMock();
     const signedUrl = "https://example.com/image.png";
+    supabase.createSignedUrl.mockResolvedValue({
+      data: { signedUrl },
+      error: null,
+    });
+
+    const file = createFileMeta({
+      filename: "image.png",
+      mime_type: "image/png",
+    });
+
+    const { result } = renderHook(() =>
+      useSupabaseFileViewer({ supabase: supabase.client })
+    );
+
+    await act(async () => {
+      await result.current.openFile(file);
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith("files");
+    expect(supabase.createSignedUrl).toHaveBeenCalledWith(
+      file.storage_key,
+      60
+    );
+    expect(result.current.state).toMatchObject({
+      isViewerOpen: true,
+      viewerFile: file,
+      viewerUrl: signedUrl,
+      viewerLoading: false,
+      viewingFileId: null,
+    });
+  });
+
+  it("opens non-previewable files in a new tab", async () => {
+    const supabase = createSupabaseMock();
+    const signedUrl = "https://example.com/document.docx";
     supabase.createSignedUrl.mockResolvedValue({
       data: { signedUrl },
       error: null,
@@ -113,8 +148,8 @@ describe("useSupabaseFileViewer", () => {
     const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
 
     const file = createFileMeta({
-      filename: "image.png",
-      mime_type: "image/png",
+      filename: "document.docx",
+      mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
 
     const { result } = renderHook(() =>

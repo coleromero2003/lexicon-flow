@@ -4,7 +4,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization, useUser } from "@clerk/nextjs";
-import { BookOpen, Calendar, ClipboardList, Layers, Link2, Plus, Save, Trash2 } from "lucide-react";
+import { BookOpen, Calendar, ClipboardList, Edit2, Layers, Link2, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
@@ -12,6 +12,7 @@ import { FilesCard } from "@/components/objects/files-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,9 @@ export default function LexiconItemPage() {
   const [isAttributeDialogOpen, setIsAttributeDialogOpen] = useState(false);
   const [newAttributeKey, setNewAttributeKey] = useState("");
   const [newAttributeValue, setNewAttributeValue] = useState("");
+  const [editingAttribute, setEditingAttribute] = useState<{ key: string; value: string } | null>(null);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
@@ -132,41 +136,54 @@ export default function LexiconItemPage() {
     const file = event.target.files?.[0];
     if (!file || !supabase || !item) return;
 
-    try {
-      const uploadedFile = await uploadLexiconFile({
-        file,
-        lexiconId,
-        lexiconSlug: item.name,
-      });
-      setFiles((prev) => [...prev, uploadedFile]);
-      toast.success("File uploaded successfully");
+    // Show the rename dialog instead of uploading immediately
+    setFileToUpload(file);
+    setIsRenameDialogOpen(true);
 
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (err) {
-      console.error("Failed to upload file", err);
-      toast.error("Failed to upload file");
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
-  }, [supabase, item, lexiconId, uploadLexiconFile]);
+  }, [supabase, item]);
 
   const handleFileDrop = useCallback(async (file: File) => {
     if (!supabase || !item) return;
 
-    try {
-      const uploadedFile = await uploadLexiconFile({
-        file,
-        lexiconId,
-        lexiconSlug: item.name,
-      });
-      setFiles((prev) => [...prev, uploadedFile]);
-      toast.success("File uploaded successfully");
-    } catch (err) {
-      console.error("Failed to upload file", err);
-      toast.error("Failed to upload file");
-    }
-  }, [supabase, item, lexiconId, uploadLexiconFile]);
+    // Show the rename dialog instead of uploading immediately
+    setFileToUpload(file);
+    setIsRenameDialogOpen(true);
+  }, [supabase, item]);
+
+  const handleConfirmRename = useCallback(
+    async (newFileName: string) => {
+      if (!fileToUpload || !item) return;
+
+      try {
+        // Create a new File object with the renamed filename
+        const renamedFile = new File([fileToUpload], newFileName, {
+          type: fileToUpload.type,
+        });
+
+        const uploadedFile = await uploadLexiconFile({
+          file: renamedFile,
+          lexiconId,
+          lexiconSlug: item.name,
+        });
+        setFiles((prev) => [...prev, uploadedFile]);
+        toast.success("File uploaded successfully");
+      } catch (err) {
+        console.error("Failed to upload file", err);
+        toast.error("Failed to upload file");
+      } finally {
+        setFileToUpload(null);
+      }
+    },
+    [fileToUpload, item, lexiconId, uploadLexiconFile]
+  );
+
+  const handleCancelRename = useCallback(() => {
+    setFileToUpload(null);
+  }, []);
 
   const handleFileDelete = useCallback(async (fileId: number) => {
     if (!supabase) return;
@@ -223,6 +240,12 @@ export default function LexiconItemPage() {
   const handleDeleteAttribute = useCallback(async (key: string) => {
     if (!supabase || !item) return;
 
+    // Prevent deletion of required part attributes
+    if (item.type === "part" && (key === "part_number" || key === "manufacturer" || key === "description")) {
+      toast.error("Cannot delete required part attributes");
+      return;
+    }
+
     try {
       const updatedAttributes = { ...item.attributes };
       delete updatedAttributes[key];
@@ -238,6 +261,54 @@ export default function LexiconItemPage() {
       toast.error("Failed to delete attribute");
     }
   }, [supabase, item, lexiconId]);
+
+  const handleStartEditAttribute = useCallback((key: string, value: unknown) => {
+    // Convert value to string for editing
+    let stringValue = "";
+    if (typeof value === "string") {
+      stringValue = value;
+    } else if (value !== null && value !== undefined) {
+      stringValue = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+    }
+
+    setEditingAttribute({ key, value: stringValue });
+  }, []);
+
+  const handleCancelEditAttribute = useCallback(() => {
+    setEditingAttribute(null);
+  }, []);
+
+  const handleSaveEditAttribute = useCallback(async () => {
+    if (!supabase || !item || !editingAttribute) return;
+
+    const { key, value } = editingAttribute;
+
+    if (!value.trim()) {
+      // Check if this is a required field for parts
+      if (item.type === "part" && (key === "part_number" || key === "manufacturer" || key === "description")) {
+        toast.error("Required part attributes cannot be empty");
+        return;
+      }
+    }
+
+    try {
+      const updatedAttributes = {
+        ...item.attributes,
+        [key]: value.trim(),
+      };
+
+      const updatedItem = await lexiconService.updateLexiconItem(supabase, lexiconId, {
+        attributes: updatedAttributes,
+      });
+
+      setItem(updatedItem);
+      setEditingAttribute(null);
+      toast.success("Attribute updated");
+    } catch (err) {
+      console.error("Failed to update attribute", err);
+      toast.error("Failed to update attribute");
+    }
+  }, [supabase, item, lexiconId, editingAttribute]);
 
   if (!userLoaded) {
     return (
@@ -435,14 +506,34 @@ export default function LexiconItemPage() {
                   />
                 ) : (
                   <div className="grid gap-4">
-                    {attributeEntries.map(([key, value]) => (
-                      <AttributeTile
-                        key={key}
-                        name={key}
-                        value={value}
-                        onDelete={() => handleDeleteAttribute(key)}
-                      />
-                    ))}
+                    {attributeEntries.map(([key, value]) => {
+                      // Prevent deletion of required part attributes
+                      const isRequiredPartAttribute = item.type === "part" &&
+                        (key === "part_number" || key === "manufacturer" || key === "description");
+
+                      const isEditing = editingAttribute?.key === key;
+
+                      return (
+                        <AttributeTile
+                          key={key}
+                          name={key}
+                          value={value}
+                          onDelete={isRequiredPartAttribute ? undefined : () => handleDeleteAttribute(key)}
+                          onEdit={() => handleStartEditAttribute(key, value)}
+                          onSave={handleSaveEditAttribute}
+                          onCancel={handleCancelEditAttribute}
+                          isRequired={isRequiredPartAttribute}
+                          isEditing={isEditing}
+                          editValue={isEditing ? editingAttribute.value : undefined}
+                          onEditValueChange={
+                            isEditing
+                              ? (newValue) =>
+                                  setEditingAttribute({ key, value: newValue })
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -526,6 +617,14 @@ export default function LexiconItemPage() {
         url={viewerUrl}
         loading={viewerLoading}
       />
+
+      <FileRenameDialog
+        open={isRenameDialogOpen}
+        onOpenChange={setIsRenameDialogOpen}
+        originalFileName={fileToUpload?.name ?? ""}
+        onConfirm={handleConfirmRename}
+        onCancel={handleCancelRename}
+      />
     </div>
   );
 }
@@ -554,10 +653,24 @@ function AttributeTile({
   name,
   value,
   onDelete,
+  onEdit,
+  onSave,
+  onCancel,
+  isRequired,
+  isEditing,
+  editValue,
+  onEditValueChange,
 }: {
   name: string;
   value: unknown;
   onDelete?: () => void;
+  onEdit?: () => void;
+  onSave?: () => void;
+  onCancel?: () => void;
+  isRequired?: boolean;
+  isEditing?: boolean;
+  editValue?: string;
+  onEditValueChange?: (value: string) => void;
 }) {
   const formattedValue = useMemo(() => {
     if (value === null || value === undefined) {
@@ -582,24 +695,75 @@ function AttributeTile({
 
   const displayName = useMemo(() => name.replace(/_/g, " "), [name]);
 
+  const isMultiline = typeof formattedValue === "string" && formattedValue.includes("\n");
+
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex items-start justify-between">
-        <p className="text-xs font-medium uppercase text-gray-500">
-          {displayName}
-        </p>
-        {onDelete && (
-          <Button variant="ghost" size="sm" onClick={onDelete}>
-            <Trash2 className="h-3 w-3 text-red-500" />
-          </Button>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium uppercase text-gray-500">
+            {displayName}
+          </p>
+          {isRequired && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+              Required
+            </Badge>
+          )}
+        </div>
+        {isEditing ? (
+          <div className="flex gap-1">
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              <X className="h-3 w-3 text-gray-500" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onSave}>
+              <Save className="h-3 w-3 text-green-600" />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-1">
+            {onEdit && (
+              <Button variant="ghost" size="sm" onClick={onEdit}>
+                <Edit2 className="h-3 w-3 text-blue-500" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button variant="ghost" size="sm" onClick={onDelete}>
+                <Trash2 className="h-3 w-3 text-red-500" />
+              </Button>
+            )}
+          </div>
         )}
       </div>
-      {typeof formattedValue === "string" && formattedValue.includes("\n") ? (
-        <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
-          {formattedValue}
-        </pre>
+
+      {isEditing ? (
+        <div className="mt-2">
+          {isMultiline || (editValue && editValue.length > 50) ? (
+            <Textarea
+              value={editValue}
+              onChange={(e) => onEditValueChange?.(e.target.value)}
+              className="w-full font-mono text-sm"
+              rows={5}
+              autoFocus
+            />
+          ) : (
+            <Input
+              value={editValue}
+              onChange={(e) => onEditValueChange?.(e.target.value)}
+              className="w-full text-sm"
+              autoFocus
+            />
+          )}
+        </div>
       ) : (
-        <p className="mt-2 text-sm text-gray-900">{formattedValue}</p>
+        <>
+          {isMultiline ? (
+            <pre className="mt-2 whitespace-pre-wrap text-sm text-gray-900">
+              {formattedValue}
+            </pre>
+          ) : (
+            <p className="mt-2 text-sm text-gray-900">{formattedValue}</p>
+          )}
+        </>
       )}
     </div>
   );
