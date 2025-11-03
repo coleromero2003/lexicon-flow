@@ -9,6 +9,16 @@ import { toast } from "sonner";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { FilesCard } from "@/components/objects/files-card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -55,6 +65,7 @@ export default function LexiconItemPage() {
   const [editingAttribute, setEditingAttribute] = useState<{ key: string; value: string } | null>(null);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
@@ -262,6 +273,21 @@ export default function LexiconItemPage() {
     }
   }, [supabase, item, lexiconId]);
 
+  const handleDeleteLexiconItem = useCallback(async () => {
+    if (!supabase || !item) return;
+
+    try {
+      await lexiconService.deleteLexiconItem(supabase, lexiconId);
+      toast.success("Lexicon item deleted successfully");
+      setIsDeleteDialogOpen(false);
+      // Navigate back to lexicon list after deletion
+      router.push("/lexicon");
+    } catch (err) {
+      console.error("Failed to delete lexicon item", err);
+      toast.error("Failed to delete lexicon item");
+    }
+  }, [supabase, item, lexiconId, router]);
+
   const handleStartEditAttribute = useCallback((key: string, value: unknown) => {
     // Convert value to string for editing
     let stringValue = "";
@@ -401,6 +427,14 @@ export default function LexiconItemPage() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href="/lexicon">Back to Lexicon</Link>
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
           </div>
         </div>
@@ -625,6 +659,28 @@ export default function LexiconItemPage() {
         onConfirm={handleConfirmRename}
         onCancel={handleCancelRename}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lexicon Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{item?.name}&rdquo;? This
+              action cannot be undone. This item will be permanently removed from
+              your organization&apos;s lexicon.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLexiconItem}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -404,6 +404,17 @@ export const objectService = {
     return data;
   },
 
+  async deleteObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("objects")
+      .delete()
+      .eq("id", objectId);
+    if (error) throw error;
+  },
+
   async linkObjectToWorkflow(
     supabase: SupabaseClient,
     objectId: number,
@@ -849,6 +860,17 @@ export const lexiconService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async deleteLexiconItem(
+    supabase: SupabaseClient,
+    lexiconId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("lexicon_items")
+      .delete()
+      .eq("id", lexiconId);
+    if (error) throw error;
   },
 };
 

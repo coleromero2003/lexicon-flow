@@ -8,19 +8,35 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { PriorityBadge } from "@/components/ui/priority-badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
-import { Project, ScadaObject } from "@/lib/supabase/models";
+import { Project, ScadaObject, ObjectPriority } from "@/lib/supabase/models";
 import {
   ListTree,
   Search,
   Plus,
   Filter,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function ObjectsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -35,6 +51,7 @@ export default function ObjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingObject, setIsCreatingObject] = useState(false);
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -79,6 +96,44 @@ export default function ObjectsPage() {
       isMounted = false;
     };
   }, [supabase, organization, projectIdNum]);
+
+  const handleCreateObject = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!supabase) return;
+
+    const formData = new FormData(e.currentTarget);
+    const title = formData.get("title") as string;
+    const description = formData.get("description") as string;
+    const priority = formData.get("priority") as ObjectPriority;
+
+    if (!title.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+
+    try {
+      const newObject = await objectService.createObject(supabase, {
+        project_id: projectIdNum,
+        title: title.trim(),
+        description_md: description.trim() || null,
+        priority: priority || "medium",
+        workflow_id: null,
+        step_id: null,
+        assignee: [],
+        due_date: null,
+        sort_order: objects.length,
+        metadata: null,
+      });
+
+      setObjects((prev) => [...prev, newObject]);
+      toast.success("Object created successfully");
+      setIsCreatingObject(false);
+      // Form will be reset automatically when dialog closes
+    } catch (err) {
+      console.error("Failed to create object:", err);
+      toast.error("Failed to create object");
+    }
+  };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -154,7 +209,7 @@ export default function ObjectsPage() {
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setIsCreatingObject(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Object
               </Button>
@@ -259,7 +314,7 @@ export default function ObjectsPage() {
                     : "Create your first SCADA object to get started."}
                 </p>
                 {!hasSearch && (
-                  <Button>
+                  <Button onClick={() => setIsCreatingObject(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Object
                   </Button>
@@ -269,6 +324,63 @@ export default function ObjectsPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Create Object Dialog */}
+      <Dialog open={isCreatingObject} onOpenChange={setIsCreatingObject}>
+        <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Object</DialogTitle>
+            <p className="text-sm text-gray-600">
+              Add a new SCADA object to this project
+            </p>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreateObject}>
+            <div className="space-y-2">
+              <Label htmlFor="object-title">Title *</Label>
+              <Input
+                id="object-title"
+                name="title"
+                placeholder="Enter object title"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="object-description">Description</Label>
+              <Textarea
+                id="object-description"
+                name="description"
+                placeholder="Enter object description"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="object-priority">Priority</Label>
+              <Select name="priority" defaultValue="medium">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreatingObject(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Create Object</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

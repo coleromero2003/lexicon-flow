@@ -253,14 +253,19 @@ function ProjectsPageContent() {
     }
 
     try {
-      await createProject({
+      const newProject = await createProject({
         name,
         description: description || undefined,
         code: code || undefined,
       });
-      event.currentTarget.reset();
-      setIsCreatingProject(false);
+
+      // Close dialog and navigate immediately after successful project creation
+      if (newProject) {
+        setIsCreatingProject(false);
+        router.push(`/projects/${newProject.id}`);
+      }
     } catch (err) {
+      // Only show error if the project itself failed to create
       setFormError(
         err instanceof Error
           ? err.message

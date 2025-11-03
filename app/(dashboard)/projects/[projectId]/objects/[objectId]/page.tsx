@@ -9,6 +9,16 @@ import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
@@ -130,6 +140,7 @@ export default function ObjectPage() {
 
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -356,6 +367,21 @@ export default function ObjectPage() {
       console.error("Failed to delete subtask", err);
       toast.error("Failed to delete subtask");
       throw err;
+    }
+  };
+
+  const handleDeleteObject = async () => {
+    if (!supabase) return;
+
+    try {
+      await objectService.deleteObject(supabase, parsedObjectId);
+      toast.success("Object deleted successfully");
+      setIsDeleteDialogOpen(false);
+      // Navigate back to objects page after deletion
+      router.push(`/projects/${parsedProjectId}/objects`);
+    } catch (err) {
+      console.error("Failed to delete object", err);
+      toast.error("Failed to delete object");
     }
   };
 
@@ -768,6 +794,7 @@ const updatedMetadata = {
             name,
           }))}
           onEdit={handleOpenEditDialog}
+          onDelete={() => setIsDeleteDialogOpen(true)}
           isPartsTableHidden={
             (object.metadata as { parts_table_hidden?: boolean })
               ?.parts_table_hidden || false
@@ -934,6 +961,28 @@ const updatedMetadata = {
         onConfirm={handleConfirmRename}
         onCancel={handleCancelRename}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Object</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{object?.title}&rdquo;? This
+              action cannot be undone. All associated data including files,
+              connections, and subtasks will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteObject}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

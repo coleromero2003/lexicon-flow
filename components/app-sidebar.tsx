@@ -113,7 +113,7 @@ export function AppSidebar() {
                   isActive={pathname === "/projects" || (pathname.startsWith("/projects/") && !selectedProjectId)}
                   tooltip="All Projects"
                 >
-                  <Link href="/dashboard">
+                  <Link href="/projects">
                     <FolderKanban />
                     <span>Projects</span>
                   </Link>
@@ -128,10 +128,8 @@ export function AppSidebar() {
         {selectedProject && (
           <>
             <SidebarGroup>
-              <SidebarGroupLabel>
-                {selectedProject.name.length > 20
-                  ? `${selectedProject.name.substring(0, 20)}...`
-                  : selectedProject.name}
+              <SidebarGroupLabel className="min-w-0">
+                {selectedProject.name}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
