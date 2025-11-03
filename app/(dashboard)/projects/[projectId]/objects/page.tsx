@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useOrganization, useUser } from "@clerk/nextjs";
@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
+import { trackScadaOperation } from "@/lib/sentry";
 import { Project, ScadaObject, ObjectPriority } from "@/lib/supabase/models";
 import {
   ListTree,
@@ -37,6 +38,15 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+
+const sanitizePlainText = (value: string) =>
+  value
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
 
 export default function ObjectsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -52,6 +62,8 @@ export default function ObjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreatingObject, setIsCreatingObject] = useState(false);
+  const [isSubmittingObject, setIsSubmittingObject] = useState(false);
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -102,21 +114,37 @@ export default function ObjectsPage() {
     if (!supabase) return;
 
     const formData = new FormData(e.currentTarget);
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const priority = formData.get("priority") as ObjectPriority;
+    const rawTitle = (formData.get("title") as string) || "";
+    const rawDescription = (formData.get("description") as string) || "";
+    const priority = (formData.get("priority") as ObjectPriority) || "medium";
 
-    if (!title.trim()) {
+    // Sanitize inputs
+    const title = sanitizePlainText(rawTitle);
+    const description = sanitizePlainText(rawDescription);
+
+    // Validate inputs
+    if (!title) {
       toast.error("Title is required");
       return;
     }
 
+    if (title.length > MAX_TITLE_LENGTH) {
+      toast.error(`Title must be ${MAX_TITLE_LENGTH} characters or fewer`);
+      return;
+    }
+
+    if (description && description.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer`);
+      return;
+    }
+
+    setIsSubmittingObject(true);
     try {
       const newObject = await objectService.createObject(supabase, {
         project_id: projectIdNum,
-        title: title.trim(),
-        description_md: description.trim() || null,
-        priority: priority || "medium",
+        title,
+        description_md: description || null,
+        priority,
         workflow_id: null,
         step_id: null,
         assignee: [],
@@ -125,13 +153,37 @@ export default function ObjectsPage() {
         metadata: null,
       });
 
+      // Track successful creation
+      trackScadaOperation(
+        "object_create",
+        projectIdNum.toString(),
+        true,
+        { objectId: newObject.id }
+      );
+
       setObjects((prev) => [...prev, newObject]);
       toast.success("Object created successfully");
+
+      // Explicitly reset the form
+      formRef.current?.reset();
+
       setIsCreatingObject(false);
-      // Form will be reset automatically when dialog closes
     } catch (err) {
       console.error("Failed to create object:", err);
-      toast.error("Failed to create object");
+
+      // Track failed creation
+      trackScadaOperation(
+        "object_create",
+        projectIdNum.toString(),
+        false,
+        { error: err instanceof Error ? err.message : "Unknown error" }
+      );
+
+      // Show actual error message to user
+      const errorMessage = err instanceof Error ? err.message : "Failed to create object";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingObject(false);
     }
   };
 
@@ -334,7 +386,7 @@ export default function ObjectsPage() {
               Add a new SCADA object to this project
             </p>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={handleCreateObject}>
+          <form ref={formRef} className="space-y-4" onSubmit={handleCreateObject}>
             <div className="space-y-2">
               <Label htmlFor="object-title">Title *</Label>
               <Input
@@ -342,6 +394,8 @@ export default function ObjectsPage() {
                 name="title"
                 placeholder="Enter object title"
                 required
+                disabled={isSubmittingObject}
+                maxLength={MAX_TITLE_LENGTH}
               />
             </div>
             <div className="space-y-2">
@@ -351,11 +405,13 @@ export default function ObjectsPage() {
                 name="description"
                 placeholder="Enter object description"
                 rows={3}
+                disabled={isSubmittingObject}
+                maxLength={MAX_DESCRIPTION_LENGTH}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="object-priority">Priority</Label>
-              <Select name="priority" defaultValue="medium">
+              <Select name="priority" defaultValue="medium" disabled={isSubmittingObject}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
@@ -373,10 +429,13 @@ export default function ObjectsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setIsCreatingObject(false)}
+                disabled={isSubmittingObject}
               >
                 Cancel
               </Button>
-              <Button type="submit">Create Object</Button>
+              <Button type="submit" disabled={isSubmittingObject}>
+                {isSubmittingObject ? "Creating..." : "Create Object"}
+              </Button>
             </div>
           </form>
         </DialogContent>

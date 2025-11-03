@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, lexiconFileService, fileService } from "@/lib/services";
+import { trackScadaOperation } from "@/lib/sentry";
 import type { LexiconItem, ScadaObject, FileMeta } from "@/lib/supabase/models";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
@@ -66,6 +67,7 @@ export default function LexiconItemPage() {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingLexiconItem, setIsDeletingLexiconItem] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
@@ -274,19 +276,47 @@ export default function LexiconItemPage() {
   }, [supabase, item, lexiconId]);
 
   const handleDeleteLexiconItem = useCallback(async () => {
-    if (!supabase || !item) return;
+    if (!supabase) return;
 
+    setIsDeletingLexiconItem(true);
     try {
       await lexiconService.deleteLexiconItem(supabase, lexiconId);
+
+      // Track successful deletion
+      trackScadaOperation(
+        "lexicon_delete",
+        organization?.id || "unknown",
+        true,
+        { lexiconId }
+      );
+
       toast.success("Lexicon item deleted successfully");
+
+      // Close dialog first to avoid visual glitches
       setIsDeleteDialogOpen(false);
-      // Navigate back to lexicon list after deletion
-      router.push("/lexicon");
+
+      // Navigate after a brief delay
+      setTimeout(() => {
+        router.push("/lexicon");
+      }, 100);
     } catch (err) {
       console.error("Failed to delete lexicon item", err);
-      toast.error("Failed to delete lexicon item");
+
+      // Track failed deletion
+      trackScadaOperation(
+        "lexicon_delete",
+        organization?.id || "unknown",
+        false,
+        { lexiconId, error: err instanceof Error ? err.message : "Unknown error" }
+      );
+
+      // Show actual error message to user
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete lexicon item";
+      toast.error(errorMessage);
+    } finally {
+      setIsDeletingLexiconItem(false);
     }
-  }, [supabase, item, lexiconId, router]);
+  }, [supabase, lexiconId, router, organization]);
 
   const handleStartEditAttribute = useCallback((key: string, value: unknown) => {
     // Convert value to string for editing
@@ -671,12 +701,13 @@ export default function LexiconItemPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingLexiconItem}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteLexiconItem}
+              disabled={isDeletingLexiconItem}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {isDeletingLexiconItem ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
