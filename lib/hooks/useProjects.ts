@@ -103,27 +103,34 @@ export function useProjects() {
       console.log("Creating workflows for project:", newProject.id);
 
       // Create workflows and their steps sequentially
-      for (const wf of defaultWorkflows) {
-        const workflow = await workflowService.createWorkflow(supabase, {
-          name: wf.name,
-          project_id: newProject.id,
-          description: null,
-          color: wf.color,
-        });
+      try {
+        for (const wf of defaultWorkflows) {
+          const workflow = await workflowService.createWorkflow(supabase, {
+            name: wf.name,
+            project_id: newProject.id,
+            description: null,
+            color: wf.color,
+          });
 
-        // Create steps for this workflow
-        await Promise.all(
-          wf.steps.map((stepTitle, index) =>
-            stepService.createStep(supabase, {
-              workflow_id: workflow.id,
-              title: stepTitle,
-              position: index,
-            })
-          )
-        );
+          // Create steps for this workflow
+          await Promise.all(
+            wf.steps.map((stepTitle, index) =>
+              stepService.createStep(supabase, {
+                workflow_id: workflow.id,
+                title: stepTitle,
+                position: index,
+              })
+            )
+          );
+        }
+        console.log("Workflows and steps created successfully");
+      } catch (workflowErr) {
+        console.error("Error creating default workflows:", workflowErr);
+        // Don't fail the entire project creation if workflows fail
+        // The project is still created successfully
+        console.warn("Project created but default workflows could not be created. You can create workflows manually.");
       }
 
-      console.log("Workflows and steps created successfully");
       setProjects((prev) => [newProject, ...prev]);
       return newProject;
     } catch (err) {

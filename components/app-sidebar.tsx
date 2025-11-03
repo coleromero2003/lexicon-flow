@@ -67,8 +67,8 @@ export function AppSidebar() {
             className="h-8 w-8"
           />
           <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="text-sm font-semibold truncate">Lexicon Flow</p>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-sm font-semibold truncate" title="Lexicon Flow">Lexicon Flow</p>
+            <p className="text-xs text-muted-foreground truncate" title={organization?.name || "No Organization"}>
               {organization?.name || "No Organization"}
             </p>
           </div>
@@ -113,7 +113,7 @@ export function AppSidebar() {
                   isActive={pathname === "/projects" || (pathname.startsWith("/projects/") && !selectedProjectId)}
                   tooltip="All Projects"
                 >
-                  <Link href="/dashboard">
+                  <Link href="/projects">
                     <FolderKanban />
                     <span>Projects</span>
                   </Link>
@@ -128,10 +128,8 @@ export function AppSidebar() {
         {selectedProject && (
           <>
             <SidebarGroup>
-              <SidebarGroupLabel>
-                {selectedProject.name.length > 20
-                  ? `${selectedProject.name.substring(0, 20)}...`
-                  : selectedProject.name}
+              <SidebarGroupLabel className="min-w-0" title={selectedProject.name}>
+                {selectedProject.name}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -233,10 +231,16 @@ export function AppSidebar() {
             <div className="flex items-center gap-2 px-2 py-2">
               <UserButton />
               <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                <p className="text-sm font-medium truncate">
+                <p
+                  className="text-sm font-medium truncate"
+                  title={user?.firstName || user?.emailAddresses[0]?.emailAddress}
+                >
                   {user?.firstName || user?.emailAddresses[0]?.emailAddress}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p
+                  className="text-xs text-muted-foreground truncate"
+                  title={user?.emailAddresses[0]?.emailAddress}
+                >
                   {user?.emailAddresses[0]?.emailAddress}
                 </p>
               </div>

@@ -9,6 +9,16 @@ import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FileRenameDialog } from "@/components/ui/file-rename-dialog";
@@ -44,6 +54,7 @@ import { useFileUpload } from "@/lib/hooks/useFileUpload";
 // import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration"; // Hidden until PDF feature is complete
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, workflowService } from "@/lib/services";
+import { trackScadaOperation } from "@/lib/sentry";
 import type {
   LexiconItem,
   RelationKind,
@@ -130,6 +141,8 @@ export default function ObjectPage() {
 
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingObject, setIsDeletingObject] = useState(false);
 
   const descriptionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -356,6 +369,49 @@ export default function ObjectPage() {
       console.error("Failed to delete subtask", err);
       toast.error("Failed to delete subtask");
       throw err;
+    }
+  };
+
+  const handleDeleteObject = async () => {
+    if (!supabase) return;
+
+    setIsDeletingObject(true);
+    try {
+      await objectService.deleteObject(supabase, parsedObjectId);
+
+      // Track successful deletion
+      trackScadaOperation(
+        "object_delete",
+        parsedProjectId.toString(),
+        true,
+        { objectId: parsedObjectId }
+      );
+
+      toast.success("Object deleted successfully");
+
+      // Close dialog first to avoid visual glitches
+      setIsDeleteDialogOpen(false);
+
+      // Navigate after a brief delay
+      setTimeout(() => {
+        router.push(`/projects/${parsedProjectId}/objects`);
+      }, 100);
+    } catch (err) {
+      console.error("Failed to delete object", err);
+
+      // Track failed deletion
+      trackScadaOperation(
+        "object_delete",
+        parsedProjectId.toString(),
+        false,
+        { objectId: parsedObjectId, error: err instanceof Error ? err.message : "Unknown error" }
+      );
+
+      // Show actual error message to user
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete object";
+      toast.error(errorMessage);
+    } finally {
+      setIsDeletingObject(false);
     }
   };
 
@@ -768,6 +824,7 @@ const updatedMetadata = {
             name,
           }))}
           onEdit={handleOpenEditDialog}
+          onDelete={() => setIsDeleteDialogOpen(true)}
           isPartsTableHidden={
             (object.metadata as { parts_table_hidden?: boolean })
               ?.parts_table_hidden || false
@@ -934,6 +991,29 @@ const updatedMetadata = {
         onConfirm={handleConfirmRename}
         onCancel={handleCancelRename}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Object</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{object?.title}&rdquo;? This
+              action cannot be undone. All associated data including files,
+              connections, and subtasks will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingObject}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteObject}
+              disabled={isDeletingObject}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingObject ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

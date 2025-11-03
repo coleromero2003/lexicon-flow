@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useOrganization, useUser } from "@clerk/nextjs";
@@ -8,19 +8,45 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { PriorityBadge } from "@/components/ui/priority-badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
-import { Project, ScadaObject } from "@/lib/supabase/models";
+import { trackScadaOperation } from "@/lib/sentry";
+import { Project, ScadaObject, ObjectPriority } from "@/lib/supabase/models";
 import {
   ListTree,
   Search,
   Plus,
   Filter,
 } from "lucide-react";
+import { toast } from "sonner";
+
+const MAX_TITLE_LENGTH = 200;
+const MAX_DESCRIPTION_LENGTH = 1000;
+
+const sanitizePlainText = (value: string) =>
+  value
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
 
 export default function ObjectsPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -35,6 +61,9 @@ export default function ObjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreatingObject, setIsCreatingObject] = useState(false);
+  const [isSubmittingObject, setIsSubmittingObject] = useState(false);
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (userLoaded && !isSignedIn) {
@@ -79,6 +108,84 @@ export default function ObjectsPage() {
       isMounted = false;
     };
   }, [supabase, organization, projectIdNum]);
+
+  const handleCreateObject = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!supabase) return;
+
+    const formData = new FormData(e.currentTarget);
+    const rawTitle = (formData.get("title") as string) || "";
+    const rawDescription = (formData.get("description") as string) || "";
+    const priority = (formData.get("priority") as ObjectPriority) || "medium";
+
+    // Sanitize inputs
+    const title = sanitizePlainText(rawTitle);
+    const description = sanitizePlainText(rawDescription);
+
+    // Validate inputs
+    if (!title) {
+      toast.error("Title is required");
+      return;
+    }
+
+    if (title.length > MAX_TITLE_LENGTH) {
+      toast.error(`Title must be ${MAX_TITLE_LENGTH} characters or fewer`);
+      return;
+    }
+
+    if (description && description.length > MAX_DESCRIPTION_LENGTH) {
+      toast.error(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer`);
+      return;
+    }
+
+    setIsSubmittingObject(true);
+    try {
+      const newObject = await objectService.createObject(supabase, {
+        project_id: projectIdNum,
+        title,
+        description_md: description || null,
+        priority,
+        workflow_id: null,
+        step_id: null,
+        assignee: [],
+        due_date: null,
+        sort_order: objects.length,
+        metadata: null,
+      });
+
+      // Track successful creation
+      trackScadaOperation(
+        "object_create",
+        projectIdNum.toString(),
+        true,
+        { objectId: newObject.id }
+      );
+
+      setObjects((prev) => [...prev, newObject]);
+      toast.success("Object created successfully");
+
+      // Explicitly reset the form
+      formRef.current?.reset();
+
+      setIsCreatingObject(false);
+    } catch (err) {
+      console.error("Failed to create object:", err);
+
+      // Track failed creation
+      trackScadaOperation(
+        "object_create",
+        projectIdNum.toString(),
+        false,
+        { error: err instanceof Error ? err.message : "Unknown error" }
+      );
+
+      // Show actual error message to user
+      const errorMessage = err instanceof Error ? err.message : "Failed to create object";
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmittingObject(false);
+    }
+  };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -154,7 +261,7 @@ export default function ObjectsPage() {
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setIsCreatingObject(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Object
               </Button>
@@ -259,7 +366,7 @@ export default function ObjectsPage() {
                     : "Create your first SCADA object to get started."}
                 </p>
                 {!hasSearch && (
-                  <Button>
+                  <Button onClick={() => setIsCreatingObject(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Object
                   </Button>
@@ -269,6 +376,70 @@ export default function ObjectsPage() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Create Object Dialog */}
+      <Dialog open={isCreatingObject} onOpenChange={setIsCreatingObject}>
+        <DialogContent className="w-[95vw] max-w-[425px] mx-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Object</DialogTitle>
+            <p className="text-sm text-gray-600">
+              Add a new SCADA object to this project
+            </p>
+          </DialogHeader>
+          <form ref={formRef} className="space-y-4" onSubmit={handleCreateObject}>
+            <div className="space-y-2">
+              <Label htmlFor="object-title">Title *</Label>
+              <Input
+                id="object-title"
+                name="title"
+                placeholder="Enter object title"
+                required
+                disabled={isSubmittingObject}
+                maxLength={MAX_TITLE_LENGTH}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="object-description">Description</Label>
+              <Textarea
+                id="object-description"
+                name="description"
+                placeholder="Enter object description"
+                rows={3}
+                disabled={isSubmittingObject}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="object-priority">Priority</Label>
+              <Select name="priority" defaultValue="medium" disabled={isSubmittingObject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreatingObject(false)}
+                disabled={isSubmittingObject}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmittingObject}>
+                {isSubmittingObject ? "Creating..." : "Create Object"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

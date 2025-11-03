@@ -9,6 +9,16 @@ import { toast } from "sonner";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { FilesCard } from "@/components/objects/files-card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, lexiconFileService, fileService } from "@/lib/services";
+import { trackScadaOperation } from "@/lib/sentry";
 import type { LexiconItem, ScadaObject, FileMeta } from "@/lib/supabase/models";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
@@ -55,6 +66,8 @@ export default function LexiconItemPage() {
   const [editingAttribute, setEditingAttribute] = useState<{ key: string; value: string } | null>(null);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeletingLexiconItem, setIsDeletingLexiconItem] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { uploadLexiconFile, isUploading } = useFileUpload();
@@ -262,6 +275,49 @@ export default function LexiconItemPage() {
     }
   }, [supabase, item, lexiconId]);
 
+  const handleDeleteLexiconItem = useCallback(async () => {
+    if (!supabase) return;
+
+    setIsDeletingLexiconItem(true);
+    try {
+      await lexiconService.deleteLexiconItem(supabase, lexiconId);
+
+      // Track successful deletion
+      trackScadaOperation(
+        "lexicon_delete",
+        organization?.id || "unknown",
+        true,
+        { lexiconId }
+      );
+
+      toast.success("Lexicon item deleted successfully");
+
+      // Close dialog first to avoid visual glitches
+      setIsDeleteDialogOpen(false);
+
+      // Navigate after a brief delay
+      setTimeout(() => {
+        router.push("/lexicon");
+      }, 100);
+    } catch (err) {
+      console.error("Failed to delete lexicon item", err);
+
+      // Track failed deletion
+      trackScadaOperation(
+        "lexicon_delete",
+        organization?.id || "unknown",
+        false,
+        { lexiconId, error: err instanceof Error ? err.message : "Unknown error" }
+      );
+
+      // Show actual error message to user
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete lexicon item";
+      toast.error(errorMessage);
+    } finally {
+      setIsDeletingLexiconItem(false);
+    }
+  }, [supabase, lexiconId, router, organization]);
+
   const handleStartEditAttribute = useCallback((key: string, value: unknown) => {
     // Convert value to string for editing
     let stringValue = "";
@@ -401,6 +457,14 @@ export default function LexiconItemPage() {
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href="/lexicon">Back to Lexicon</Link>
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
           </div>
         </div>
@@ -625,6 +689,29 @@ export default function LexiconItemPage() {
         onConfirm={handleConfirmRename}
         onCancel={handleCancelRename}
       />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lexicon Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{item?.name}&rdquo;? This
+              action cannot be undone. This item will be permanently removed from
+              your organization&apos;s lexicon.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingLexiconItem}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLexiconItem}
+              disabled={isDeletingLexiconItem}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingLexiconItem ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
