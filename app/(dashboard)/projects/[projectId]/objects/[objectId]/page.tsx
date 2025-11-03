@@ -5,7 +5,7 @@ import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useOrganization } from "@clerk/nextjs";
 import { toast } from "sonner";
-import { FileText, FileCheck } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
@@ -22,6 +22,7 @@ import {
   LinkLexiconDialog,
   LinkObjectDialog,
   ObjectHeader,
+  // PdfSelectionDialog, // Hidden until feature is complete
   PropertiesCard,
   SubtasksCard,
   WorkflowsCard,
@@ -40,7 +41,7 @@ import { useObjectLexicon } from "@/lib/hooks/useObjectLexicon";
 import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useMetadataSuggestions } from "@/lib/hooks/useMetadataSuggestions";
 import { useFileUpload } from "@/lib/hooks/useFileUpload";
-import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration";
+// import { usePdfGeneration } from "@/lib/hooks/usePdfGeneration"; // Hidden until PDF feature is complete
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { lexiconService, objectService, workflowService } from "@/lib/services";
 import type {
@@ -49,7 +50,6 @@ import type {
   ScadaObject,
   Workflow,
 } from "@/lib/supabase/models";
-import { FileDown, FilePlus2 } from "lucide-react";
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -79,14 +79,15 @@ export default function ObjectPage() {
   const { suggestions: metadataSuggestions } =
     useMetadataSuggestions(parsedProjectId);
   const { uploadObjectFile, isUploading: isUploadingFile } = useFileUpload();
-  const {
-    isGenerating,
-    isMerging,
-    isCompiling,
-    generateAndDownloadReport,
-    mergeAndDownloadPdfs,
-    compileAndDownloadPdfs,
-  } = usePdfGeneration();
+  // PDF generation hook - Hidden until feature is complete
+  // const {
+  //   isGenerating,
+  //   isMerging,
+  //   isCompiling,
+  //   generateAndDownloadReport,
+  //   mergeAndDownloadPdfs,
+  //   compileAndDownloadPdfs,
+  // } = usePdfGeneration();
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editDialogKey, setEditDialogKey] = useState(0);
@@ -120,6 +121,9 @@ export default function ObjectPage() {
 
   const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] =
     useState(false);
+  // PDF selection dialog state - Hidden until feature is complete
+  // const [isPdfSelectionDialogOpen, setIsPdfSelectionDialogOpen] =
+  //   useState(false);
 
   const [projectWorkflows, setProjectWorkflows] = useState<Workflow[]>([]);
   const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
@@ -669,6 +673,40 @@ const updatedMetadata = {
     }
   };
 
+  // PDF type selection handler - Hidden until feature is complete
+  // const handlePdfTypeSelection = useCallback(
+  //   (type: "purchase-report" | "merge-pdfs" | "compile-pdfs" | "submittal-pdf") => {
+  //     if (!object) return;
+  //
+  //     switch (type) {
+  //       case "purchase-report":
+  //         generateAndDownloadReport(parsedObjectId, object.title);
+  //         break;
+  //       case "merge-pdfs": {
+  //         const pdfFileIds = objectFiles
+  //           .filter((f) => f.mime_type === "application/pdf")
+  //           .map((f) => f.id);
+  //         mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
+  //         break;
+  //       }
+  //       case "compile-pdfs":
+  //         compileAndDownloadPdfs(parsedObjectId, object.title);
+  //         break;
+  //       case "submittal-pdf":
+  //         setIsSubmittalPdfDialogOpen(true);
+  //         break;
+  //     }
+  //   },
+  //   [
+  //     object,
+  //     parsedObjectId,
+  //     objectFiles,
+  //     generateAndDownloadReport,
+  //     mergeAndDownloadPdfs,
+  //     compileAndDownloadPdfs,
+  //   ]
+  // );
+
   if (loading || subtasksHook.loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -737,58 +775,19 @@ const updatedMetadata = {
           onTogglePartsTable={handleTogglePartsTableVisibility}
         />
 
-        {/* PDF Generation Actions */}
-        <div className="flex gap-2 mb-4 flex-wrap">
+        {/* PDF Generation Actions - Hidden until feature is complete */}
+        {/* <div className="flex gap-2 mb-4 flex-wrap">
           <Button
-            onClick={() =>
-              generateAndDownloadReport(parsedObjectId, object.title)
-            }
-            disabled={isGenerating}
-            variant="outline"
-          >
-            <FileDown className="h-4 w-4 mr-2" />
-            {isGenerating ? "Generating..." : "Generate Purchase Report"}
-          </Button>
-
-          {objectFiles.filter((f) => f.mime_type === "application/pdf").length >
-            1 && (
-            <Button
-              onClick={() => {
-                const pdfFileIds = objectFiles
-                  .filter((f) => f.mime_type === "application/pdf")
-                  .map((f) => f.id);
-                mergeAndDownloadPdfs(pdfFileIds, `merged-${object.title}.pdf`);
-              }}
-              disabled={isMerging}
-              variant="outline"
-            >
-              <FilePlus2 className="h-4 w-4 mr-2" />
-              {isMerging
-                ? "Merging..."
-                : `Merge ${
-                    objectFiles.filter((f) => f.mime_type === "application/pdf")
-                      .length
-                  } PDFs`}
-            </Button>
-          )}
-
-          <Button
-            onClick={() => compileAndDownloadPdfs(parsedObjectId, object.title)}
-            disabled={isCompiling}
+            onClick={() => setIsPdfSelectionDialogOpen(true)}
+            disabled={isGenerating || isMerging || isCompiling}
             variant="outline"
           >
             <FileText className="h-4 w-4 mr-2" />
-            {isCompiling ? "Compiling..." : "Compile All PDFs"}
+            {isGenerating || isMerging || isCompiling
+              ? "Processing..."
+              : "Generate PDF"}
           </Button>
-
-          <Button
-            onClick={() => setIsSubmittalPdfDialogOpen(true)}
-            variant="outline"
-          >
-            <FileCheck className="h-4 w-4 mr-2" />
-            Generate Submittal PDF
-          </Button>
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6 lg:gap-8">
           <div className="space-y-6">
@@ -919,6 +918,14 @@ const updatedMetadata = {
         onOpenChange={setIsSubmittalPdfDialogOpen}
         submittalObject={object}
       />
+
+      {/* PDF Selection Dialog - Hidden until feature is complete */}
+      {/* <PdfSelectionDialog
+        open={isPdfSelectionDialogOpen}
+        onOpenChange={setIsPdfSelectionDialogOpen}
+        onSelect={handlePdfTypeSelection}
+        pdfCount={objectFiles.filter((f) => f.mime_type === "application/pdf").length}
+      /> */}
 
       <FileRenameDialog
         open={isRenameDialogOpen}
