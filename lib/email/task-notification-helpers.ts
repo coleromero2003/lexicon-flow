@@ -4,7 +4,8 @@
  */
 
 import { Task } from '../supabase/models';
-import { sendTaskNotification, getNewlyAddedAssignees } from './send-task-notification';
+import { sendTaskNotificationAction } from './actions';
+import { getNewlyAddedAssignees } from './send-task-notification';
 
 interface NotificationContext {
   assignerName: string;
@@ -36,9 +37,9 @@ export async function notifyTaskCreated(
     return { success: true, message: 'No assignees to notify' };
   }
 
-  return sendTaskNotification({
-    taskId: task.id,
-    newAssigneeIds: task.assignee,
+  return sendTaskNotificationAction({
+    task,
+    assigneeIds: task.assignee,
     assignerName: context.assignerName,
     organizationName: context.organizationName,
     objectName: context.objectName,
@@ -76,9 +77,9 @@ export async function notifyTaskUpdated(
     return { success: true, message: 'No new assignees to notify' };
   }
 
-  return sendTaskNotification({
-    taskId: updatedTask.id,
-    newAssigneeIds: newlyAdded,
+  return sendTaskNotificationAction({
+    task: updatedTask,
+    assigneeIds: newlyAdded,
     assignerName: context.assignerName,
     organizationName: context.organizationName,
     objectName: context.objectName,

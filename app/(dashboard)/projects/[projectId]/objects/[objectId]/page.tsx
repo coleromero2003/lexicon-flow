@@ -370,7 +370,7 @@ export default function ObjectPage() {
         const result = await notifyTaskUpdated(oldTask, updatedTask, context);
 
         if (!result.success) {
-          console.error("Failed to send email notifications:", result.error);
+          console.error("Failed to send email notifications:", 'error' in result ? result.error : 'Unknown error');
           // Don't show error to user, just log it
         }
       }
@@ -411,7 +411,7 @@ export default function ObjectPage() {
         const result = await notifyTaskCreated(newTask, context);
 
         if (!result.success) {
-          console.error("Failed to send email notifications:", result.error);
+          console.error("Failed to send email notifications:", 'error' in result ? result.error : 'Unknown error');
           // Don't show error to user, just log it
         }
       }
