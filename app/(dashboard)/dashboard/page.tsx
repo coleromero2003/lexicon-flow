@@ -145,40 +145,19 @@ function ProjectsPageContent() {
 
       setAssignedObjects(userObjects);
 
-      // Fetch tasks assigned to user for their objects
-      let objectTasks: ObjectSubtask[] = [];
-      if (userObjects.length > 0) {
-        const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
-        const { data: tasks, error: tasksError } = await supabase
-          .from("tasks")
-          .select("*")
-          .in("object_id", objectIds)
-          .eq("is_done", false)
-          .contains("assignee", [user.id])
-          .order("sort_order", { ascending: true });
-
-        if (tasksError) {
-          console.error("Tasks query error:", tasksError);
-        } else {
-          objectTasks = tasks || [];
-        }
-      }
-
-      // Fetch standalone tasks assigned to user (database-level filtering)
-      const { data: standaloneTasks, error: standaloneError } = await supabase
+      // Fetch all tasks assigned to user (regardless of object association)
+      const { data: userTasks, error: tasksError } = await supabase
         .from("tasks")
         .select("*")
-        .is("object_id", null)
         .eq("is_done", false)
         .contains("assignee", [user.id])
         .order("sort_order", { ascending: true });
 
-      if (standaloneError) {
-        console.error("Standalone tasks query error:", standaloneError);
+      if (tasksError) {
+        console.error("Tasks query error:", tasksError);
       }
 
-      // Combine both types of tasks (no client-side filtering needed)
-      setAssignedTasks([...objectTasks, ...(standaloneTasks || [])]);
+      setAssignedTasks(userTasks || []);
     } catch (err) {
       console.error("Failed to load user assignments", err);
       // Set empty arrays on error
