@@ -145,7 +145,7 @@ function ProjectsPageContent() {
 
       setAssignedObjects(userObjects);
 
-      // Fetch tasks for user's objects
+      // Fetch tasks assigned to user for their objects
       let objectTasks: ObjectSubtask[] = [];
       if (userObjects.length > 0) {
         const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
@@ -154,6 +154,7 @@ function ProjectsPageContent() {
           .select("*")
           .in("object_id", objectIds)
           .eq("is_done", false)
+          .contains("assignee", [user.id])
           .order("sort_order", { ascending: true });
 
         if (tasksError) {
