@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { Plus, ListTodo, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,11 @@ import { useOrganizationUsers } from "@/lib/hooks/useOrganizationUsers";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { Task, ObjectPriority, ScadaObject } from "@/lib/supabase/models";
 import { Badge } from "@/components/ui/badge";
+import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/lib/email/task-notification-helpers";
 
 export default function TasksPage() {
   const { organization, membership } = useOrganization();
+  const { user } = useUser();
   const { supabase } = useSupabase();
   const { users: organizationUsers } = useOrganizationUsers();
 
@@ -93,19 +95,39 @@ export default function TasksPage() {
     }
 
     try {
-      await supabase?.from("tasks").insert({
-        org_id: organization.id,
-        object_id: null, // Standalone task
-        title: task.title,
-        details: task.details || null,
-        assignee: task.assignee || [],
-        due_date: task.dueDate ? task.dueDate.toISOString().split("T")[0] : null,
-        priority: task.priority || "medium",
-        is_done: false,
-        sort_order: 0,
-      });
+      if (!supabase) throw new Error("Supabase client not initialized");
+
+      const { data: newTask, error } = await supabase
+        .from("tasks")
+        .insert({
+          org_id: organization.id,
+          object_id: null, // Standalone task
+          title: task.title,
+          details: task.details || null,
+          assignee: task.assignee || [],
+          due_date: task.dueDate ? task.dueDate.toISOString().split("T")[0] : null,
+          priority: task.priority || "medium",
+          is_done: false,
+          sort_order: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
 
       toast.success("Task created successfully");
+
+      // Send email notifications to assignees
+      if (newTask && task.assignee && task.assignee.length > 0) {
+        const context = getNotificationContext(user || null, organization || null);
+        const result = await notifyTaskCreated(newTask, context);
+
+        if (!result.success) {
+          console.error("Failed to send email notifications:", result.error);
+          // Don't show error to user, just log it
+        }
+      }
+
       await reloadTasks();
     } catch (err) {
       console.error("Failed to create task", err);
@@ -116,7 +138,23 @@ export default function TasksPage() {
 
   const handleEditTask = async (taskId: number, updates: Partial<Task>) => {
     try {
-      await updateTask(taskId, updates);
+      // Get the old task before updating
+      const oldTask = tasks.find((t) => t.id === taskId);
+
+      // Update the task
+      const updatedTask = await updateTask(taskId, updates);
+
+      // Send email notifications to newly added assignees
+      if (oldTask && updatedTask && updates.assignee) {
+        const context = getNotificationContext(user || null, organization || null);
+        const result = await notifyTaskUpdated(oldTask, updatedTask, context);
+
+        if (!result.success) {
+          console.error("Failed to send email notifications:", result.error);
+          // Don't show error to user, just log it
+        }
+      }
+
       toast.success("Task updated successfully");
     } catch (err) {
       console.error("Failed to update task", err);

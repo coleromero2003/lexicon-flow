@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
+import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/lib/email/task-notification-helpers";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
@@ -67,6 +68,7 @@ export default function ObjectPage() {
     projectId: string;
   }>();
   const router = useRouter();
+  const { user } = useUser();
 
   const parsedObjectId = Number(objectId);
   const parsedProjectId = Number(projectId);
@@ -352,7 +354,27 @@ export default function ObjectPage() {
     updates: Partial<typeof subtasksHook.subtasks[0]>
   ) => {
     try {
-      await subtasksHook.updateSubtask(subtaskId, updates);
+      // Get the old task before updating
+      const oldTask = subtasksHook.subtasks.find((t) => t.id === subtaskId);
+
+      // Update the task
+      const updatedTask = await subtasksHook.updateSubtask(subtaskId, updates);
+
+      // Send email notifications to newly added assignees
+      if (oldTask && updatedTask && updates.assignee) {
+        const context = getNotificationContext(user || null, organization || null, {
+          objectName: object?.title,
+          projectId: parsedProjectId,
+          objectId: parsedObjectId,
+        });
+        const result = await notifyTaskUpdated(oldTask, updatedTask, context);
+
+        if (!result.success) {
+          console.error("Failed to send email notifications:", result.error);
+          // Don't show error to user, just log it
+        }
+      }
+
       toast.success("Task updated");
     } catch (err) {
       console.error("Failed to update task", err);
@@ -371,13 +393,29 @@ export default function ObjectPage() {
     if (!title.trim()) return;
 
     try {
-      await subtasksHook.createSubtask(
+      const newTask = await subtasksHook.createSubtask(
         title.trim(),
         details,
         assignee,
         dueDate,
         priority
       );
+
+      // Send email notifications to assignees
+      if (assignee && assignee.length > 0) {
+        const context = getNotificationContext(user || null, organization || null, {
+          objectName: object?.title,
+          projectId: parsedProjectId,
+          objectId: parsedObjectId,
+        });
+        const result = await notifyTaskCreated(newTask, context);
+
+        if (!result.success) {
+          console.error("Failed to send email notifications:", result.error);
+          // Don't show error to user, just log it
+        }
+      }
+
       toast.success("Task added");
     } catch (err) {
       console.error("Failed to add task", err);
