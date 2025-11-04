@@ -40,8 +40,7 @@ import {
   RELATION_KIND_OPTIONS,
 } from "@/components/objects";
 import type { PriorityValue } from "@/components/objects";
-import { PartsListCard } from "@/components/objects/parts-list-card";
-import { partListService } from "@/lib/services";
+import { PartsTable } from "@/components/parts-table";
 import { useObject } from "@/lib/hooks/useObjects";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { useSubtasks } from "@/lib/hooks/useSubtasks";
@@ -75,7 +74,7 @@ export default function ObjectPage() {
   const { supabase } = useSupabase();
   const { organization } = useOrganization();
 
-  const { object, loading, error, updateObject, reloadObject } =
+  const { object, loading, error, updateObject } =
     useObject(parsedObjectId);
   const subtasksHook = useSubtasks(parsedObjectId);
   const {
@@ -903,11 +902,14 @@ const updatedMetadata = {
 
             {!(object.metadata as { parts_table_hidden?: boolean })
               ?.parts_table_hidden && (
-              <PartsListCard
-                objectId={parsedObjectId}
-                parts={partListService.getPartsList(object)}
-                onUpdate={reloadObject}
-              />
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <PartsTable
+                  objectId={parsedObjectId}
+                  projectId={parsedProjectId}
+                  showProjectColumn={false}
+                  showObjectColumn={false}
+                />
+              </div>
             )}
 
             <FilesCard

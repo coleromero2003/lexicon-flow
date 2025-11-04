@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Library,
   ListTodo,
+  Package,
 } from "lucide-react";
 import {
   Sidebar,
@@ -132,6 +133,18 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/parts"}
+                  tooltip="Parts"
+                >
+                  <Link href="/parts">
+                    <Package />
+                    <span>Parts</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -211,6 +224,20 @@ export function AppSidebar() {
                       <Link href={`/projects/${selectedProjectId}/files`}>
                         <FileText />
                         <span>Files</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(
+                        `/projects/${selectedProjectId}/parts`
+                      )}
+                      tooltip="Parts"
+                    >
+                      <Link href={`/projects/${selectedProjectId}/parts`}>
+                        <Package />
+                        <span>Parts</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

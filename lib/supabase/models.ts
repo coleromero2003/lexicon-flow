@@ -101,6 +101,27 @@ export interface Task {
 // Legacy type alias for backward compatibility (can be removed after all references are updated)
 export type ObjectSubtask = Task;
 
+// ===== PARTS =====
+export interface Part {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  part_number: string;
+  description: string;
+  quantity: number;
+  project_id: number;
+  organization_id: string;
+  ordered: boolean;
+  ordered_date: string | null;
+  received: boolean;
+  received_date: string | null;
+  delivered: boolean;
+  delivered_date: string | null;
+  object_id: number | null;
+  lexicon_item_id: number | null;
+  comments: string | null;
+}
+
 // ===== FILES =====
 export interface FileMeta {
   id: number;

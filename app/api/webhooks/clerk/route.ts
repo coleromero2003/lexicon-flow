@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { Webhook } from "svix";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import { createClient } from "@supabase/supabase-js";
+import { sendUserAddedEmail } from "@/lib/email/email-service";
 
 export async function POST(req: Request) {
   // Get the webhook secret from environment variables
@@ -52,7 +53,50 @@ export async function POST(req: Request) {
   // Handle the webhook
   const eventType = evt.type;
 
-  if (eventType === "organization.deleted") {
+  if (eventType === "organizationMembership.created") {
+    const { organization, public_user_data } = evt.data;
+
+    if (!organization || !public_user_data) {
+      console.error("Missing organization or user data in webhook payload");
+      return new Response("Invalid webhook payload", { status: 400 });
+    }
+
+    console.log(`User ${public_user_data.user_id} added to organization ${organization.id}`);
+
+    try {
+      // Get user details
+      const userEmail = public_user_data.identifier;
+      const userName =
+        public_user_data.first_name && public_user_data.last_name
+          ? `${public_user_data.first_name} ${public_user_data.last_name}`
+          : userEmail;
+
+      // Get organization name
+      const organizationName = organization.name;
+
+      // For the inviter name, we could fetch the user who invited them,
+      // but for now we'll use the organization name
+      const inviterName = "your administrator";
+
+      // Send welcome email
+      const result = await sendUserAddedEmail({
+        userEmail,
+        userName,
+        organizationName,
+        inviterName,
+      });
+
+      if (!result.success) {
+        console.error("Failed to send welcome email:", result.error);
+        // Don't fail the webhook, just log the error
+      } else {
+        console.log(`Welcome email sent to ${userEmail}`);
+      }
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+      // Don't fail the webhook, just log the error
+    }
+  } else if (eventType === "organization.deleted") {
     const { id: orgId } = evt.data;
 
     console.log(`Organization deleted: ${orgId}`);
