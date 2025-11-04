@@ -14,6 +14,7 @@ import {
   PartAttributes,
   PartListEntry,
   ObjectMetadata,
+  Part,
 } from "./supabase/models";
 import { SupabaseClient } from "@supabase/supabase-js";
 
@@ -1462,6 +1463,147 @@ export const submittalService = {
       specObject,
       billOfMaterials,
       partsSheets,
+    };
+  },
+};
+
+// =======================
+// PARTS SERVICES
+// =======================
+export const partService = {
+  async getParts(supabase: SupabaseClient): Promise<Part[]> {
+    const { data, error } = await supabase
+      .from("parts")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPartsByProject(
+    supabase: SupabaseClient,
+    projectId: number
+  ): Promise<Part[]> {
+    const { data, error } = await supabase
+      .from("parts")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPartsByObject(
+    supabase: SupabaseClient,
+    objectId: number
+  ): Promise<Part[]> {
+    const { data, error } = await supabase
+      .from("parts")
+      .select("*")
+      .eq("object_id", objectId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPart(
+    supabase: SupabaseClient,
+    partId: number
+  ): Promise<Part | null> {
+    const { data, error } = await supabase
+      .from("parts")
+      .select("*")
+      .eq("id", partId)
+      .single();
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found error
+        return null;
+      }
+      throw error;
+    }
+    return data;
+  },
+
+  async createPart(
+    supabase: SupabaseClient,
+    part: Omit<Part, "id" | "created_at" | "updated_at">
+  ): Promise<Part> {
+    // Validate quantity is positive
+    if (part.quantity <= 0) {
+      throw new Error("Quantity must be positive");
+    }
+
+    const { data, error } = await supabase
+      .from("parts")
+      .insert(part)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async updatePart(
+    supabase: SupabaseClient,
+    partId: number,
+    updates: Partial<Part>
+  ): Promise<Part> {
+    // Validate quantity if being updated
+    if (updates.quantity !== undefined && updates.quantity <= 0) {
+      throw new Error("Quantity must be positive");
+    }
+
+    const { data, error } = await supabase
+      .from("parts")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", partId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deletePart(
+    supabase: SupabaseClient,
+    partId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("parts")
+      .delete()
+      .eq("id", partId);
+    if (error) throw error;
+  },
+
+  /**
+   * Get part with lexicon item data for inheritance
+   */
+  async getPartWithLexicon(
+    supabase: SupabaseClient,
+    partId: number
+  ): Promise<(Part & { lexicon_item?: LexiconItem }) | null> {
+    const { data, error } = await supabase
+      .from("parts")
+      .select(`
+        *,
+        lexicon_item:lexicon_items(*)
+      `)
+      .eq("id", partId)
+      .single();
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw error;
+    }
+
+    // Handle the joined data
+    const lexiconItem = Array.isArray(data.lexicon_item)
+      ? data.lexicon_item[0]
+      : data.lexicon_item;
+
+    return {
+      ...data,
+      lexicon_item: lexiconItem || undefined,
     };
   },
 };

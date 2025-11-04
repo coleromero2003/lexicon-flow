@@ -83,6 +83,7 @@
 * 🔐 **Authentication** - Secure user authentication via Clerk
 * 🏢 **Organizations** - Multi-tenant support for team collaboration
 * 💳 **Subscription Tiers** - Free, Pro, and Enterprise plans with different limits
+* 📧 **Email Notifications** - Automated emails for task assignments and user invitations via Resend
 * 📡 **Real-Time Sync** - Live updates across all connected clients
 * 🔒 **Row-Level Security** - Fine-grained access control via Supabase RLS
 * 🍪 **GDPR Compliance** - Cookie consent notice
@@ -105,6 +106,7 @@
 ### Backend & Infrastructure
 * **Supabase** - PostgreSQL database, real-time subscriptions, storage, and Row-Level Security
 * **Clerk** - Authentication and organization management
+* **Resend** - Transactional email service for notifications
 * **Vercel** - Deployment and hosting
 
 ### Development & Testing
@@ -204,11 +206,20 @@ All database operations go through a service layer ([lib/services.ts](lib/servic
    # Supabase
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
    # Clerk
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
    CLERK_SECRET_KEY=your_clerk_secret_key
+   CLERK_WEBHOOK_SECRET=your_webhook_secret
+
+   # Resend (Email Notifications)
+   RESEND_API_KEY=your_resend_api_key
+   RESEND_FROM_EMAIL=notifications@yourdomain.com
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
    ```
+
+   See `.env.example` for a complete list of environment variables.
 
 4. **Set up local Supabase (optional but recommended)**
    ```bash
