@@ -1,13 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useOrganization } from "@clerk/nextjs";
 import { useSupabase } from "../supabase/SupabaseProvider";
-import { ObjectSubtask } from "../supabase/models";
-import { objectSubtaskService } from "../services";
+import { Task } from "../supabase/models";
+import { taskService } from "../services";
 
 export function useSubtasks(objectId: number) {
   const { supabase } = useSupabase();
-  const [subtasks, setSubtasks] = useState<ObjectSubtask[]>([]);
+  const { organization } = useOrganization();
+  const [subtasks, setSubtasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,13 +19,13 @@ export function useSubtasks(objectId: number) {
     try {
       setLoading(true);
       setError(null);
-      const data = await objectSubtaskService.getSubtasksByObject(
+      const data = await taskService.getTasksByObject(
         supabase,
         objectId
       );
       setSubtasks(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load subtasks");
+      setError(err instanceof Error ? err.message : "Failed to load tasks");
     } finally {
       setLoading(false);
     }
@@ -34,8 +36,9 @@ export function useSubtasks(objectId: number) {
   }, [loadSubtasks]);
 
   const createSubtask = useCallback(
-    async (title: string) => {
+    async (title: string, details?: string, assignee?: string[], dueDate?: Date, priority?: Task["priority"]) => {
       if (!supabase) throw new Error("Supabase client not initialized");
+      if (!organization) throw new Error("Organization not found");
 
       try {
         const maxOrder =
@@ -43,9 +46,14 @@ export function useSubtasks(objectId: number) {
             ? Math.max(...subtasks.map((s) => s.sort_order))
             : 0;
 
-        const newSubtask = await objectSubtaskService.createSubtask(supabase, {
+        const newSubtask = await taskService.createTask(supabase, {
+          org_id: organization.id,
           object_id: objectId,
           title,
+          details: details || null,
+          assignee: assignee || [],
+          due_date: dueDate ? dueDate.toISOString().split('T')[0] : null,
+          priority: priority || "medium",
           is_done: false,
           sort_order: maxOrder + 1,
         });
@@ -54,20 +62,20 @@ export function useSubtasks(objectId: number) {
         return newSubtask;
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to create subtask"
+          err instanceof Error ? err.message : "Failed to create task"
         );
         throw err;
       }
     },
-    [supabase, objectId, subtasks]
+    [supabase, objectId, organization, subtasks]
   );
 
   const updateSubtask = useCallback(
-    async (subtaskId: number, updates: Partial<ObjectSubtask>) => {
+    async (subtaskId: number, updates: Partial<Task>) => {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const updated = await objectSubtaskService.updateSubtask(
+        const updated = await taskService.updateTask(
           supabase,
           subtaskId,
           updates
@@ -79,7 +87,7 @@ export function useSubtasks(objectId: number) {
         return updated;
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to update subtask"
+          err instanceof Error ? err.message : "Failed to update task"
         );
         throw err;
       }
@@ -99,17 +107,11 @@ export function useSubtasks(objectId: number) {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const { error } = await supabase
-          .from("object_subtasks")
-          .delete()
-          .eq("id", subtaskId);
-
-        if (error) throw error;
-
+        await taskService.deleteTask(supabase, subtaskId);
         setSubtasks((prev) => prev.filter((st) => st.id !== subtaskId));
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to delete subtask"
+          err instanceof Error ? err.message : "Failed to delete task"
         );
         throw err;
       }
@@ -118,13 +120,13 @@ export function useSubtasks(objectId: number) {
   );
 
   const reorderSubtasks = useCallback(
-    async (reorderedSubtasks: ObjectSubtask[]) => {
+    async (reorderedSubtasks: Task[]) => {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
         // Update sort_order for all subtasks
         const updates = reorderedSubtasks.map((subtask, index) =>
-          objectSubtaskService.updateSubtask(supabase, subtask.id, {
+          taskService.updateTask(supabase, subtask.id, {
             sort_order: index,
           })
         );
@@ -133,7 +135,7 @@ export function useSubtasks(objectId: number) {
         setSubtasks(reorderedSubtasks);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to reorder subtasks"
+          err instanceof Error ? err.message : "Failed to reorder tasks"
         );
         throw err;
       }

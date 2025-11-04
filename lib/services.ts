@@ -4,7 +4,7 @@ import {
   Step,
   ScadaObject,
   ObjectRelation,
-  ObjectSubtask,
+  Task,
   ObjectFileLink,
   ObjectLexiconLink,
   FileMeta,
@@ -508,15 +508,18 @@ export const objectRelationService = {
 };
 
 // =======================
-// OBJECT SUBTASKS
+// TASKS (formerly OBJECT SUBTASKS)
 // =======================
-export const objectSubtaskService = {
-  async getSubtasksByObject(
+export const taskService = {
+  /**
+   * Get all tasks linked to a specific object
+   */
+  async getTasksByObject(
     supabase: SupabaseClient,
     objectId: number
-  ): Promise<ObjectSubtask[]> {
+  ): Promise<Task[]> {
     const { data, error } = await supabase
-      .from("object_subtasks")
+      .from("tasks")
       .select("*")
       .eq("object_id", objectId)
       .order("sort_order", { ascending: true });
@@ -524,46 +527,111 @@ export const objectSubtaskService = {
     return data || [];
   },
 
-  async getSubtasks(
-    supabase: SupabaseClient,
-    objectId: number
-  ): Promise<ObjectSubtask[]> {
+  /**
+   * Get all tasks for the current organization (including standalone tasks)
+   */
+  async getTasksByOrg(
+    supabase: SupabaseClient
+  ): Promise<Task[]> {
     const { data, error } = await supabase
-      .from("object_subtasks")
+      .from("tasks")
       .select("*")
-      .eq("object_id", objectId)
-      .order("sort_order", { ascending: true });
+      .order("created_at", { ascending: false });
     if (error) throw error;
     return data || [];
   },
 
-  async createSubtask(
-    supabase: SupabaseClient,
-    subtask: Omit<ObjectSubtask, "id">
-  ): Promise<ObjectSubtask> {
+  /**
+   * Get standalone tasks (not linked to any object) for the current organization
+   */
+  async getStandaloneTasks(
+    supabase: SupabaseClient
+  ): Promise<Task[]> {
     const { data, error } = await supabase
-      .from("object_subtasks")
-      .insert(subtask)
+      .from("tasks")
+      .select("*")
+      .is("object_id", null)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  /**
+   * Get a single task by ID
+   */
+  async getTaskById(
+    supabase: SupabaseClient,
+    taskId: number
+  ): Promise<Task | null> {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("id", taskId)
+      .single();
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      throw error;
+    }
+    return data;
+  },
+
+  /**
+   * Create a new task
+   */
+  async createTask(
+    supabase: SupabaseClient,
+    task: Omit<Task, "id" | "created_at" | "updated_at">
+  ): Promise<Task> {
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert(task)
       .select()
       .single();
     if (error) throw error;
     return data;
   },
 
-  async updateSubtask(
+  /**
+   * Update an existing task
+   */
+  async updateTask(
     supabase: SupabaseClient,
-    subtaskId: number,
-    updates: Partial<ObjectSubtask>
-  ): Promise<ObjectSubtask> {
+    taskId: number,
+    updates: Partial<Task>
+  ): Promise<Task> {
     const { data, error } = await supabase
-      .from("object_subtasks")
+      .from("tasks")
       .update(updates)
-      .eq("id", subtaskId)
+      .eq("id", taskId)
       .select()
       .single();
     if (error) throw error;
     return data;
   },
+
+  /**
+   * Delete a task
+   */
+  async deleteTask(
+    supabase: SupabaseClient,
+    taskId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("tasks")
+      .delete()
+      .eq("id", taskId);
+    if (error) throw error;
+  },
+};
+
+// Legacy export for backward compatibility (can be removed after all references are updated)
+export const objectSubtaskService = {
+  getSubtasksByObject: taskService.getTasksByObject,
+  getSubtasks: taskService.getTasksByObject,
+  createSubtask: taskService.createTask,
+  updateSubtask: taskService.updateTask,
 };
 
 // =======================

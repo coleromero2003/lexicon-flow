@@ -340,23 +340,49 @@ export default function ObjectPage() {
   const handleToggleSubtask = async (subtaskId: number, isDone: boolean) => {
     try {
       await subtasksHook.toggleSubtask(subtaskId, isDone);
-      toast.success(isDone ? "Subtask completed" : "Subtask reopened");
+      toast.success(isDone ? "Task completed" : "Task reopened");
     } catch (err) {
-      console.error("Failed to toggle subtask", err);
-      toast.error("Failed to update subtask");
+      console.error("Failed to toggle task", err);
+      toast.error("Failed to update task");
       throw err;
     }
   };
 
-  const handleAddSubtask = async (title: string) => {
+  const handleUpdateSubtask = async (
+    subtaskId: number,
+    updates: Partial<typeof subtasksHook.subtasks[0]>
+  ) => {
+    try {
+      await subtasksHook.updateSubtask(subtaskId, updates);
+      toast.success("Task updated");
+    } catch (err) {
+      console.error("Failed to update task", err);
+      toast.error("Failed to update task");
+      throw err;
+    }
+  };
+
+  const handleAddSubtask = async (
+    title: string,
+    details?: string,
+    assignee?: string[],
+    dueDate?: Date,
+    priority?: "low" | "medium" | "high" | "urgent"
+  ) => {
     if (!title.trim()) return;
 
     try {
-      await subtasksHook.createSubtask(title.trim());
-      toast.success("Subtask added");
+      await subtasksHook.createSubtask(
+        title.trim(),
+        details,
+        assignee,
+        dueDate,
+        priority
+      );
+      toast.success("Task added");
     } catch (err) {
-      console.error("Failed to add subtask", err);
-      toast.error("Failed to add subtask");
+      console.error("Failed to add task", err);
+      toast.error("Failed to add task");
       throw err;
     }
   };
@@ -364,10 +390,10 @@ export default function ObjectPage() {
   const handleDeleteSubtask = async (subtaskId: number) => {
     try {
       await subtasksHook.deleteSubtask(subtaskId);
-      toast.success("Subtask deleted");
+      toast.success("Task deleted");
     } catch (err) {
-      console.error("Failed to delete subtask", err);
-      toast.error("Failed to delete subtask");
+      console.error("Failed to delete task", err);
+      toast.error("Failed to delete task");
       throw err;
     }
   };
@@ -420,10 +446,10 @@ export default function ObjectPage() {
   ) => {
     try {
       await subtasksHook.reorderSubtasks(reordered);
-      toast.success("Subtasks reordered");
+      toast.success("Tasks reordered");
     } catch (err) {
-      console.error("Failed to reorder subtasks", err);
-      toast.error("Failed to reorder subtasks");
+      console.error("Failed to reorder tasks", err);
+      toast.error("Failed to reorder tasks");
       throw err;
     }
   };
@@ -866,8 +892,13 @@ const updatedMetadata = {
               subtasks={subtasksHook.subtasks}
               onToggle={handleToggleSubtask}
               onAdd={handleAddSubtask}
+              onUpdate={handleUpdateSubtask}
               onDelete={handleDeleteSubtask}
               onReorder={handleReorderSubtasks}
+              orgUsers={organizationUsers.map(({ userId, name }) => ({
+                userId,
+                name,
+              }))}
             />
 
             {!(object.metadata as { parts_table_hidden?: boolean })
