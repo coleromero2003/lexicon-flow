@@ -13,6 +13,7 @@ import {
   FileText,
   LayoutDashboard,
   Library,
+  ListTodo,
 } from "lucide-react";
 import {
   Sidebar,
@@ -87,11 +88,23 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={pathname === "/dashboard"}
-                  tooltip="All Projects"
+                  tooltip="Dashboard"
                 >
                   <Link href="/dashboard">
                     <LayoutDashboard />
                     <span>Dashboard</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === "/tasks"}
+                  tooltip="Tasks"
+                >
+                  <Link href="/tasks">
+                    <ListTodo />
+                    <span>Tasks</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

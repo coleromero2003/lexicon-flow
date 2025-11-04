@@ -145,18 +145,18 @@ function ProjectsPageContent() {
 
       setAssignedObjects(userObjects);
 
-      // Fetch all subtasks for user's objects
+      // Fetch all tasks for user's objects
       if (userObjects.length > 0) {
         const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
         const { data: tasks, error: tasksError } = await supabase
-          .from("object_subtasks")
+          .from("tasks")
           .select("*")
           .in("object_id", objectIds)
           .eq("is_done", false)
           .order("sort_order", { ascending: true });
 
         if (tasksError) {
-          console.error("Subtasks query error:", tasksError);
+          console.error("Tasks query error:", tasksError);
           // Don't throw - just set empty tasks
           setAssignedTasks([]);
         } else {

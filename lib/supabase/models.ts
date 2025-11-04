@@ -82,14 +82,24 @@ export interface ObjectRelation {
   dst_object_id: number;
 }
 
-// ===== OBJECT SUBTASKS =====
-export interface ObjectSubtask {
+// ===== TASKS (formerly OBJECT SUBTASKS) =====
+export interface Task {
   id: number;
-  object_id: number;
+  created_at: string;
+  updated_at: string;
+  org_id: string;
+  object_id: number | null; // Optional reference to a SCADA object
   title: string;
+  details: string | null;
+  assignee: string[]; // Array of user IDs for multiple assignees
+  due_date: string | null;
+  priority: ObjectPriority;
   is_done: boolean;
   sort_order: number;
 }
+
+// Legacy type alias for backward compatibility (can be removed after all references are updated)
+export type ObjectSubtask = Task;
 
 // ===== FILES =====
 export interface FileMeta {
@@ -162,7 +172,9 @@ export interface ObjectMetadata extends Record<string, unknown> {
 }
 
 export type ObjectWithFiles = ScadaObject & { files: FileMeta[] };
-export type ObjectWithSubtasks = ScadaObject & { subtasks: ObjectSubtask[] };
+export type ObjectWithTasks = ScadaObject & { tasks: Task[] };
+// Legacy type alias for backward compatibility
+export type ObjectWithSubtasks = ObjectWithTasks;
 export type ObjectWithRelations = ScadaObject & {
   relations: ObjectRelation[];
 };

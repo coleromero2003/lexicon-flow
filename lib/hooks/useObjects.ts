@@ -4,7 +4,7 @@ import { useOrganization } from "@clerk/nextjs";
 import {
   objectService,
   objectRelationService,
-  objectSubtaskService,
+  taskService,
   objectFileService,
   objectLexiconService,
   fileService,
@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import {
   ScadaObject,
   ObjectRelation,
-  ObjectSubtask,
+  Task,
   FileMeta,
   LexiconItem,
   ObjectLexiconLink,
@@ -34,7 +34,7 @@ export interface ObjectWithAllDetails extends ScadaObject {
     relation: ObjectRelation;
     relatedObject: ScadaObject;
   }>;
-  subtasks: ObjectSubtask[];
+  subtasks: Task[];
   files: FileMeta[];
   lexiconLinks: Array<{
     link: ObjectLexiconLink;
@@ -116,8 +116,8 @@ export function useObject(objectId: number) {
         )
       ).filter((item): item is { relation: ObjectRelation; relatedObject: ScadaObject } => item !== null);
 
-      // Get subtasks
-      const subtasks = await objectSubtaskService.getSubtasksByObject(
+      // Get subtasks (tasks linked to this object)
+      const subtasks = await taskService.getTasksByObject(
         supabase,
         objectId
       );
@@ -200,7 +200,7 @@ export function useObject(objectId: number) {
     if (!supabase) throw new Error("Supabase client not initialized");
 
     try {
-      await objectSubtaskService.updateSubtask(supabase, subtaskId, {
+      await taskService.updateTask(supabase, subtaskId, {
         is_done: isDone,
       });
 
@@ -216,7 +216,7 @@ export function useObject(objectId: number) {
       });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update subtask."
+        err instanceof Error ? err.message : "Failed to update task."
       );
       throw err;
     }

@@ -3,6 +3,8 @@ export { EditObjectDialog } from "./edit-object-dialog";
 export { DescriptionCard } from "./description-card";
 export { WorkflowsCard } from "./workflows-card";
 export { SubtasksCard } from "./subtasks-card";
+export { AddTaskDialog } from "./add-task-dialog";
+export { EditTaskDialog } from "./edit-task-dialog";
 export { FilesCard } from "./files-card";
 export { PropertiesCard } from "./properties-card";
 export { ConnectionsCard } from "./connections-card";
