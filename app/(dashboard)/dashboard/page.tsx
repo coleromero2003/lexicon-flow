@@ -145,7 +145,8 @@ function ProjectsPageContent() {
 
       setAssignedObjects(userObjects);
 
-      // Fetch all tasks for user's objects
+      // Fetch tasks for user's objects
+      let objectTasks: ObjectSubtask[] = [];
       if (userObjects.length > 0) {
         const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
         const { data: tasks, error: tasksError } = await supabase
@@ -157,14 +158,30 @@ function ProjectsPageContent() {
 
         if (tasksError) {
           console.error("Tasks query error:", tasksError);
-          // Don't throw - just set empty tasks
-          setAssignedTasks([]);
         } else {
-          setAssignedTasks(tasks || []);
+          objectTasks = tasks || [];
         }
-      } else {
-        setAssignedTasks([]);
       }
+
+      // Fetch standalone tasks (not assigned to any object) that are assigned to the user
+      const { data: standaloneTasks, error: standaloneError } = await supabase
+        .from("tasks")
+        .select("*")
+        .is("object_id", null)
+        .eq("is_done", false)
+        .order("sort_order", { ascending: true });
+
+      if (standaloneError) {
+        console.error("Standalone tasks query error:", standaloneError);
+      }
+
+      // Filter standalone tasks where user is in assignee array
+      const userStandaloneTasks = (standaloneTasks || []).filter((task: ObjectSubtask) =>
+        task.assignee && task.assignee.includes(user.id)
+      );
+
+      // Combine both types of tasks
+      setAssignedTasks([...objectTasks, ...userStandaloneTasks]);
     } catch (err) {
       console.error("Failed to load user assignments", err);
       // Set empty arrays on error
@@ -472,7 +489,7 @@ function ProjectsPageContent() {
                   </div>
                   <div className="space-y-2">
                     {assignedTasks.slice(0, 10).map((task) => {
-                      const object = assignedObjects.find((obj) => obj.id === task.object_id);
+                      const object = task.object_id ? assignedObjects.find((obj) => obj.id === task.object_id) : null;
                       return (
                         <div
                           key={task.id}
@@ -482,9 +499,18 @@ function ProjectsPageContent() {
                             <p className="text-sm font-medium text-gray-900">
                               {task.title}
                             </p>
-                            {object && (
+                            {object ? (
                               <p className="text-xs text-gray-500 mt-1">
                                 Object: {object.title}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Standalone task
+                              </p>
+                            )}
+                            {task.due_date && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Due: {new Date(task.due_date).toLocaleDateString()}
                               </p>
                             )}
                           </div>
