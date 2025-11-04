@@ -163,25 +163,21 @@ function ProjectsPageContent() {
         }
       }
 
-      // Fetch standalone tasks (not assigned to any object) that are assigned to the user
+      // Fetch standalone tasks assigned to user (database-level filtering)
       const { data: standaloneTasks, error: standaloneError } = await supabase
         .from("tasks")
         .select("*")
         .is("object_id", null)
         .eq("is_done", false)
+        .contains("assignee", [user.id])
         .order("sort_order", { ascending: true });
 
       if (standaloneError) {
         console.error("Standalone tasks query error:", standaloneError);
       }
 
-      // Filter standalone tasks where user is in assignee array
-      const userStandaloneTasks = (standaloneTasks || []).filter((task: ObjectSubtask) =>
-        task.assignee && task.assignee.includes(user.id)
-      );
-
-      // Combine both types of tasks
-      setAssignedTasks([...objectTasks, ...userStandaloneTasks]);
+      // Combine both types of tasks (no client-side filtering needed)
+      setAssignedTasks([...objectTasks, ...(standaloneTasks || [])]);
     } catch (err) {
       console.error("Failed to load user assignments", err);
       // Set empty arrays on error
