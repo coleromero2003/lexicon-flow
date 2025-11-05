@@ -8,7 +8,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -21,12 +21,13 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { ExcelViewerDialog } from "@/components/file-viewer/excel-viewer-dialog";
+import { FilesCard } from "@/components/objects/files-card";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { fileService, projectService } from "@/lib/services";
 import { FileMeta, Project } from "@/lib/supabase/models";
 import { formatFileSize } from "@/lib/utils/format-file-size";
-import { FileText, Filter, Plus, Search, Table, ImageIcon, Download, Loader2 } from "lucide-react";
+import { Filter, Plus, Search } from "lucide-react";
 
 // Helper to determine if file is an Excel file
 function isExcelFile(file: { filename: string; mime_type?: string | null } | null): boolean {
@@ -44,38 +45,6 @@ function isExcelFile(file: { filename: string; mime_type?: string | null } | nul
     fileName.endsWith(".xlsb") ||
     fileName.endsWith(".csv")
   );
-}
-
-// Helper to determine file type from mime type and filename
-function getFileType(file: FileMeta): "pdf" | "excel" | "image" | "other" {
-  const mimeType = (file.mime_type ?? "").toLowerCase();
-  const fileName = file.filename.toLowerCase();
-
-  // Check for PDF
-  if (mimeType.includes("pdf") || fileName.endsWith(".pdf")) {
-    return "pdf";
-  }
-
-  // Check for images
-  if (
-    mimeType.includes("image") ||
-    fileName.endsWith(".png") ||
-    fileName.endsWith(".jpg") ||
-    fileName.endsWith(".jpeg") ||
-    fileName.endsWith(".gif") ||
-    fileName.endsWith(".webp") ||
-    fileName.endsWith(".svg") ||
-    fileName.endsWith(".bmp")
-  ) {
-    return "image";
-  }
-
-  // Check for Excel files
-  if (isExcelFile(file)) {
-    return "excel";
-  }
-
-  return "other";
 }
 
 export default function ProjectFilesPage() {
@@ -185,8 +154,6 @@ export default function ProjectFilesPage() {
     () => filteredFiles.filter((file) => !file.mime_type).length,
     [filteredFiles]
   );
-
-  const hasSearch = normalizedQuery.length > 0;
 
   if (!userLoaded || !isSignedIn) {
     return null;
@@ -337,96 +304,11 @@ export default function ProjectFilesPage() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <FileText className="h-5 w-5 text-purple-500" /> Files
-            </CardTitle>
-            <CardDescription>All files in this project. Search to quickly find documents.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {filteredFiles.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {filteredFiles.map((file) => {
-                  const fileType = getFileType(file);
-                  const isPdf = fileType === "pdf";
-                  const isExcel = fileType === "excel";
-                  const isImage = fileType === "image";
-
-                  // Determine icon based on file type
-                  const FileIcon = isImage ? ImageIcon : isExcel ? Table : isPdf ? FileText : Download;
-                  const iconColor = isImage ? "text-purple-600" : isExcel ? "text-green-600" : isPdf ? "text-blue-600" : "text-gray-600";
-
-                  return (
-                    <div
-                      key={file.id}
-                      className="group rounded-lg border bg-white p-4 shadow-sm transition hover:border-purple-400 hover:shadow cursor-pointer"
-                      onClick={() => openFile(file)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openFile(file);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <FileIcon className={`h-8 w-8 flex-shrink-0 ${iconColor}`} />
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-gray-900 truncate">{file.filename}</h3>
-                            <p className="mt-1 text-sm text-gray-600">
-                              Uploaded {new Date(file.created_at).toLocaleDateString()} · {formatFileSize(file.size_bytes)}
-                            </p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-                              {file.mime_type ? (
-                                <span className="inline-flex rounded-full bg-purple-100 px-2 py-1 font-medium text-purple-700">
-                                  {file.mime_type}
-                                </span>
-                              ) : (
-                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">
-                                  Unknown type
-                                </span>
-                              )}
-                              {file.uploaded_by && (
-                                <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">
-                                  Uploaded by {file.uploaded_by}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        {viewingFileId === file.id && (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground flex-shrink-0" />
-                        )}
-                      </div>
-                      <div className="mt-3 text-xs text-gray-500">Storage key: {file.storage_key}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {hasSearch ? "No files match your search" : "No files yet"}
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  {hasSearch
-                    ? "Try a different keyword to locate the file you're looking for."
-                    : "Upload files to make them available to the project team."}
-                </p>
-                {!hasSearch && (
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Upload File
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <FilesCard
+          files={filteredFiles}
+          onView={openFile}
+          viewingFileId={viewingFileId}
+        />
       </main>
 
       {isExcelFile(viewerFile) ? (
