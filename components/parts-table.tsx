@@ -30,6 +30,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -37,12 +43,18 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Trash2, Plus, Check, ChevronsUpDown, Search, ExternalLink, GripVertical } from "lucide-react";
+import { Trash2, Plus, Check, ChevronsUpDown, Search, ExternalLink, GripVertical, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useParts } from "@/lib/hooks/useParts";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService } from "@/lib/services";
+import {
+  exportPartsToCSV,
+  exportPartsToXLSX,
+  generatePartsExportFilename,
+} from "@/lib/utils/parts-export";
+import { toast } from "sonner";
 import {
   DndContext,
   closestCenter,
@@ -428,6 +440,50 @@ export function PartsTable({
     return new Date(date).toLocaleDateString();
   };
 
+  const handleExportCSV = () => {
+    try {
+      if (filteredParts.length === 0) {
+        toast.error("No parts to export");
+        return;
+      }
+
+      const filename = objectId
+        ? generatePartsExportFilename(
+            objects[objectId]?.title || `object-${objectId}`,
+            "csv"
+          )
+        : "parts-list.csv";
+
+      exportPartsToCSV(filteredParts, filename);
+      toast.success("Parts exported to CSV successfully");
+    } catch (error) {
+      console.error("Failed to export parts to CSV:", error);
+      toast.error("Failed to export parts to CSV");
+    }
+  };
+
+  const handleExportXLSX = () => {
+    try {
+      if (filteredParts.length === 0) {
+        toast.error("No parts to export");
+        return;
+      }
+
+      const filename = objectId
+        ? generatePartsExportFilename(
+            objects[objectId]?.title || `object-${objectId}`,
+            "xlsx"
+          )
+        : "parts-list.xlsx";
+
+      exportPartsToXLSX(filteredParts, filename);
+      toast.success("Parts exported to Excel successfully");
+    } catch (error) {
+      console.error("Failed to export parts to Excel:", error);
+      toast.error("Failed to export parts to Excel");
+    }
+  };
+
   // Render cell content based on column ID
   const renderCell = (columnId: string, part: Part, isNewRow = false) => {
     const width = columnWidths[columnId] || 150;
@@ -729,6 +785,22 @@ export function PartsTable({
               className="pl-8 w-full sm:w-[250px]"
             />
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={filteredParts.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportXLSX}>
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button onClick={() => setIsAddingNew(true)} disabled={isAddingNew}>
             <Plus className="mr-2 h-4 w-4" />
             Add Part
