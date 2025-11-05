@@ -136,6 +136,18 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
+                  isActive={pathname === "/objects" || (pathname.startsWith("/objects/") && !selectedProjectId)}
+                  tooltip="All Objects"
+                >
+                  <Link href="/objects">
+                    <Box />
+                    <span>Objects</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
                   isActive={pathname === "/parts"}
                   tooltip="Parts"
                 >
