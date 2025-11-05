@@ -456,6 +456,20 @@ export const objectService = {
     if (error) throw error;
     return data;
   },
+
+  async getObjectsByOrganization(
+    supabase: SupabaseClient
+  ): Promise<ScadaObject[]> {
+    const { data, error } = await supabase
+      .from("objects")
+      .select(`
+        *,
+        projects!inner(id, name, org_id)
+      `)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
 };
 
 // =======================

@@ -9,6 +9,7 @@ import { FileText } from "lucide-react";
 import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/lib/email/task-notification-helpers";
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { ExcelViewerDialog } from "@/components/file-viewer/excel-viewer-dialog";
 import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
 import {
   AlertDialog,
@@ -61,6 +62,24 @@ import type {
   ScadaObject,
   Workflow,
 } from "@/lib/supabase/models";
+
+// Helper to determine if file is an Excel file
+function isExcelFile(file: { filename: string; mime_type?: string | null } | null): boolean {
+  if (!file) return false;
+  const mimeType = (file.mime_type ?? "").toLowerCase();
+  const fileName = file.filename.toLowerCase();
+
+  return (
+    mimeType.includes("spreadsheet") ||
+    mimeType.includes("excel") ||
+    mimeType === "text/csv" ||
+    fileName.endsWith(".xlsx") ||
+    fileName.endsWith(".xls") ||
+    fileName.endsWith(".xlsm") ||
+    fileName.endsWith(".xlsb") ||
+    fileName.endsWith(".csv")
+  );
+}
 
 export default function ObjectPage() {
   const { objectId, projectId } = useParams<{
@@ -1033,13 +1052,23 @@ const updatedMetadata = {
         isLoadingItems={isLoadingLexiconItems}
       />
 
-      <PdfViewerDialog
-        open={isViewerOpen}
-        onOpenChange={setViewerOpen}
-        file={viewerFile}
-        url={viewerUrl}
-        loading={viewerLoading}
-      />
+      {isExcelFile(viewerFile) ? (
+        <ExcelViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      ) : (
+        <PdfViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      )}
 
       <SubmittalPDFDialog
         open={isSubmittalPdfDialogOpen}

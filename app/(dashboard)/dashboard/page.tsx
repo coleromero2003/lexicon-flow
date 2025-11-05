@@ -143,12 +143,55 @@ function ProjectsPageContent() {
         obj.assignee && obj.assignee.includes(user.id)
       );
 
-      setAssignedObjects(userObjects);
+      // Fetch all steps to determine which are final steps
+      const { data: allSteps, error: stepsError } = await supabase
+        .from("steps")
+        .select("id, workflow_id, position");
+
+      if (stepsError) {
+        console.error("Steps query error:", stepsError);
+        throw stepsError;
+      }
+
+      // Build a map of workflow_id -> max position
+      const maxPositions = new Map<number, number>();
+      (allSteps || []).forEach((step: { workflow_id: number; position: number }) => {
+        const current = maxPositions.get(step.workflow_id) ?? -1;
+        if (step.position > current) {
+          maxPositions.set(step.workflow_id, step.position);
+        }
+      });
+
+      // Build a set of final step IDs
+      const finalStepIds = new Set<number>();
+      (allSteps || []).forEach((step: { id: number; workflow_id: number; position: number }) => {
+        if (step.position === maxPositions.get(step.workflow_id)) {
+          finalStepIds.add(step.id);
+        }
+      });
+
+      // Filter out objects that are ONLY on final steps
+      const incompleteUserObjects = userObjects.filter((obj: ObjectWithProject) => {
+        // If object has no steps, include it
+        if (!obj.step_id || obj.step_id.length === 0) {
+          return true;
+        }
+
+        // Check if ALL of the object's steps are final steps
+        const allStepsAreFinal = obj.step_id.every((stepId: number) =>
+          finalStepIds.has(stepId)
+        );
+
+        // Only include if NOT all steps are final
+        return !allStepsAreFinal;
+      });
+
+      setAssignedObjects(incompleteUserObjects);
 
       // Fetch tasks assigned to objects that belong to the user
       let objectTasks: ObjectSubtask[] = [];
-      if (userObjects.length > 0) {
-        const objectIds = userObjects.map((obj: ObjectWithProject) => obj.id);
+      if (incompleteUserObjects.length > 0) {
+        const objectIds = incompleteUserObjects.map((obj: ObjectWithProject) => obj.id);
         const { data: tasks, error: tasksError } = await supabase
           .from("tasks")
           .select("*")
@@ -208,9 +251,14 @@ function ProjectsPageContent() {
         (!filters.dateRange.end ||
           new Date(project.created_at) <= new Date(filters.dateRange.end));
 
-      return matchesSearch && matchesDateRange;
+      // Only include projects that have at least one assigned incomplete object
+      const hasAssignedIncompleteObject = assignedObjects.some(
+        (obj) => obj.project_id === project.id
+      );
+
+      return matchesSearch && matchesDateRange && hasAssignedIncompleteObject;
     });
-  }, [filters, projects]);
+  }, [filters, projects, assignedObjects]);
 
   if (!userLoaded) {
     return (

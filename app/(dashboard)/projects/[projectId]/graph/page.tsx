@@ -36,6 +36,7 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { ExcelViewerDialog } from "@/components/file-viewer/excel-viewer-dialog";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import {
@@ -94,111 +95,64 @@ const EDGE_LEGEND = [
   { label: "Lexicon ↔ File", color: EDGE_COLORS.lexiconFile },
 ] as const;
 
-const OBJECT_CIRCLE_RADIUS = 6; // Inner circle for SCADA objects
-const FILE_CIRCLE_RADIUS = 10; // Middle circle for project files
-const LEXICON_CIRCLE_RADIUS = 14; // Outer circle for lexicon items
-
-type GraphAttributes = Record<string, unknown>;
-
-type GraphInstance = {
-  addNode: (key: string, attributes?: GraphAttributes) => void;
-  addDirectedEdgeWithKey: (
-    key: string,
-    source: string,
-    target: string,
-    attributes?: GraphAttributes
-  ) => void;
-  addUndirectedEdgeWithKey: (
-    key: string,
-    source: string,
-    target: string,
-    attributes?: GraphAttributes
-  ) => void;
-  hasNode: (key: string) => boolean;
-  hasEdge: (key: string) => boolean;
-  getNodeAttributes: (key: string) => GraphAttributes;
-};
-
-type GraphConstructor = new () => GraphInstance;
-
 type SigmaNodeEvent = { node: string };
 
-type SigmaInstance = {
-  on: (event: string, handler: (payload: SigmaNodeEvent) => void) => void;
-  off: (event: string, handler: (payload: SigmaNodeEvent) => void) => void;
-  refresh: () => void;
-  kill: () => void;
-};
+// Helper to determine if file is an Excel file
+function isExcelFile(file: { filename: string; mime_type?: string | null } | null): boolean {
+  if (!file) return false;
+  const mimeType = (file.mime_type ?? "").toLowerCase();
+  const fileName = file.filename.toLowerCase();
 
-type SigmaConstructor = new (
-  graph: GraphInstance,
-  container: HTMLElement,
-  settings?: Record<string, unknown>
-) => SigmaInstance;
-
-function getPolarPosition(index: number, total: number, radius: number) {
-  if (total <= 1) {
-    return { x: radius, y: 0 };
-  }
-
-  const angle = (index / total) * 2 * Math.PI;
-  return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-  };
+  return (
+    mimeType.includes("spreadsheet") ||
+    mimeType.includes("excel") ||
+    mimeType === "text/csv" ||
+    fileName.endsWith(".xlsx") ||
+    fileName.endsWith(".xls") ||
+    fileName.endsWith(".xlsm") ||
+    fileName.endsWith(".xlsb") ||
+    fileName.endsWith(".csv")
+  );
 }
 
 function buildGraph(
-  GraphLibrary: GraphConstructor,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  GraphLibrary: any,
   data: GraphData
-): GraphInstance {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
   const graph = new GraphLibrary();
 
-  const objectCount = data.objects.length;
-  data.objects.forEach((object, index) => {
-    const { x, y } = getPolarPosition(
-      index,
-      Math.max(objectCount, 1),
-      OBJECT_CIRCLE_RADIUS
-    );
+  // Add objects with random initial positions (will be repositioned by force layout)
+  data.objects.forEach((object) => {
     graph.addNode(`object-${object.id}`, {
       label: object.title,
-      x,
-      y,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
       size: 12,
       color: NODE_COLORS.object,
       type: "circle",
     });
   });
 
-  const fileCount = data.files.length;
-  data.files.forEach((file, index) => {
-    const { x, y } = getPolarPosition(
-      index,
-      Math.max(fileCount, 1),
-      FILE_CIRCLE_RADIUS
-    );
+  // Add files with random initial positions
+  data.files.forEach((file) => {
     graph.addNode(`file-${file.id}`, {
       label: file.filename,
-      x,
-      y,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
       size: 8,
       color: NODE_COLORS.file,
       type: "circle",
     });
   });
 
-  const lexiconCount = data.lexiconItems.length;
-  data.lexiconItems.forEach((item, index) => {
-    const { x, y } = getPolarPosition(
-      index,
-      Math.max(lexiconCount, 1),
-      LEXICON_CIRCLE_RADIUS
-    );
+  // Add lexicon items with random initial positions
+  data.lexiconItems.forEach((item) => {
     graph.addNode(`lexicon-${item.id}`, {
       label: item.name,
-      x,
-      y,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
       size: 9,
       color: NODE_COLORS.lexicon,
       type: "circle",
@@ -303,7 +257,8 @@ function ProjectGraphPageContent() {
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const sigmaInstanceRef = useRef<SigmaInstance | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sigmaInstanceRef = useRef<any>(null);
 
   const {
     openFile,
@@ -455,26 +410,41 @@ function ProjectGraphPageContent() {
 
     const initSigma = async () => {
       try {
-        const [{ default: GraphLibrary }, { default: SigmaLibrary }] =
-          await Promise.all([import("graphology"), import("sigma")]);
+        const [
+          { default: GraphLibrary },
+          { default: SigmaLibrary },
+          { default: forceAtlas2 },
+        ] = await Promise.all([
+          import("graphology"),
+          import("sigma"),
+          import("graphology-layout-forceatlas2"),
+        ]);
 
         if (!containerRef.current || !active) {
           return;
         }
 
-        const graph = buildGraph(
-          GraphLibrary as unknown as GraphConstructor,
-          graphData
-        );
+        const graph = buildGraph(GraphLibrary, graphData);
 
-        const renderer = new (SigmaLibrary as unknown as SigmaConstructor)(
-          graph,
-          containerRef.current,
-          {
-            renderLabels: true,
-            labelDensity: 1,
-          }
-        );
+        // Apply force-directed layout for a more organic, circular pattern
+        forceAtlas2.assign(graph, {
+          iterations: 50,
+          settings: {
+            gravity: 1,
+            scalingRatio: 10,
+            slowDown: 1,
+            barnesHutOptimize: true,
+            barnesHutTheta: 0.5,
+            strongGravityMode: false,
+            outboundAttractionDistribution: false,
+            adjustSizes: false,
+          },
+        });
+
+        const renderer = new SigmaLibrary(graph, containerRef.current, {
+          renderLabels: true,
+          labelDensity: 1,
+        });
         sigmaInstanceRef.current = renderer;
 
         const handleNodeClick = async (event: SigmaNodeEvent) => {
@@ -834,13 +804,23 @@ function ProjectGraphPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <PdfViewerDialog
-        open={isViewerOpen}
-        onOpenChange={setViewerOpen}
-        file={viewerFile}
-        url={viewerUrl}
-        loading={viewerLoading}
-      />
+      {isExcelFile(viewerFile) ? (
+        <ExcelViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      ) : (
+        <PdfViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      )}
     </div>
   );
 }
