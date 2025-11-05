@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useOrganization, useAuth } from "@clerk/nextjs";
@@ -17,13 +17,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
+import { ExcelViewerDialog } from "@/components/file-viewer/excel-viewer-dialog";
+import { FilesCard } from "@/components/objects/files-card";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
+import { useSupabaseFileViewer } from "@/lib/hooks/useSupabaseFileViewer";
 import { fileService, objectService, projectService, workflowService } from "@/lib/services";
 import { FileMeta, Project, ScadaObject, Workflow } from "@/lib/supabase/models";
-import { formatFileSize } from "@/lib/utils/format-file-size";
 import { toast } from "sonner";
 import {
-  FolderKanban,
   LayoutDashboard,
   ListTree,
   MoreVertical,
@@ -35,6 +37,24 @@ import {
 } from "lucide-react";
 
 const MAX_WORKFLOWS_IN_ROW = 3;
+
+// Helper to determine if file is an Excel file
+function isExcelFile(file: { filename: string; mime_type?: string | null } | null): boolean {
+  if (!file) return false;
+  const mimeType = (file.mime_type ?? "").toLowerCase();
+  const fileName = file.filename.toLowerCase();
+
+  return (
+    mimeType.includes("spreadsheet") ||
+    mimeType.includes("excel") ||
+    mimeType === "text/csv" ||
+    fileName.endsWith(".xlsx") ||
+    fileName.endsWith(".xls") ||
+    fileName.endsWith(".xlsm") ||
+    fileName.endsWith(".xlsb") ||
+    fileName.endsWith(".csv")
+  );
+}
 
 export default function ProjectDashboardPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -69,6 +89,28 @@ export default function ProjectDashboardPage() {
     status: "",
     start_date: "",
     end_date: "",
+  });
+
+  const storageBucket = useMemo(() => "lexicon-files", []);
+
+  const handleFileViewerError = useCallback((error: Error) => {
+    console.error("Failed to open file", error);
+    toast.error(error.message || "Failed to open file");
+  }, []);
+
+  const {
+    openFile,
+    setViewerOpen,
+    state: {
+      isViewerOpen,
+      viewerFile,
+      viewerUrl,
+      viewerLoading,
+    },
+  } = useSupabaseFileViewer({
+    supabase,
+    bucket: storageBucket,
+    onError: handleFileViewerError,
   });
 
   useEffect(() => {
@@ -530,45 +572,10 @@ export default function ProjectDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <FolderKanban className="h-5 w-5 text-purple-500" /> Files
-            </CardTitle>
-            <CardDescription>Recent project files and documents.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {filteredFiles.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {filteredFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-purple-400 hover:shadow"
-                  >
-                    <h3 className="text-base font-semibold text-gray-900">{file.filename}</h3>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Uploaded {new Date(file.created_at).toLocaleDateString()} · {formatFileSize(file.size_bytes)}
-                    </p>
-                    {file.mime_type && (
-                      <p className="mt-2 inline-flex rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700">
-                        {file.mime_type}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title={hasSearch ? "No files match your search" : "No files yet"}
-                description={
-                  hasSearch
-                    ? "Broaden your search to include other file names."
-                    : "Upload files to make them available to the project team."
-                }
-              />
-            )}
-          </CardContent>
-        </Card>
+        <FilesCard
+          files={filteredFiles}
+          onView={openFile}
+        />
       </main>
 
       {/* Edit Project Dialog */}
@@ -672,6 +679,24 @@ export default function ProjectDashboardPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {isExcelFile(viewerFile) ? (
+        <ExcelViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      ) : (
+        <PdfViewerDialog
+          open={isViewerOpen}
+          onOpenChange={setViewerOpen}
+          file={viewerFile}
+          url={viewerUrl}
+          loading={viewerLoading}
+        />
+      )}
     </div>
   );
 }
