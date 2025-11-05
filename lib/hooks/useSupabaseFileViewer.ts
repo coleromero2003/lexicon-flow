@@ -100,8 +100,17 @@ export const useSupabaseFileViewer = ({
         fileName.endsWith(".webp") ||
         fileName.endsWith(".svg") ||
         fileName.endsWith(".bmp");
+      const isExcel =
+        mimeType.includes("spreadsheet") ||
+        mimeType.includes("excel") ||
+        mimeType === "text/csv" ||
+        fileName.endsWith(".xlsx") ||
+        fileName.endsWith(".xls") ||
+        fileName.endsWith(".xlsm") ||
+        fileName.endsWith(".xlsb") ||
+        fileName.endsWith(".csv");
 
-      const canPreview = isPdf || isImage;
+      const canPreview = isPdf || isImage || isExcel;
 
       setViewingFileId(file.id);
 
