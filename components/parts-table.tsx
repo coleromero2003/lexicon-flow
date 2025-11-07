@@ -219,7 +219,21 @@ export function PartsTable({
   const [lexiconItems, setLexiconItems] = useState<Record<number, LexiconItem>>({});
   const [availablePartLexicons, setAvailablePartLexicons] = useState<LexiconItem[]>([]);
 
-  const [newPart, setNewPart] = useState({
+  const [newPart, setNewPart] = useState<{
+    part_number: string;
+    description: string;
+    quantity: number;
+    project_id: number;
+    object_id: number | null;
+    lexicon_item_id: number | null;
+    comments: string;
+    ordered: boolean;
+    ordered_date: string | null;
+    received: boolean;
+    received_date: string | null;
+    delivered: boolean;
+    delivered_date: string | null;
+  }>({
     part_number: "",
     description: "",
     quantity: 1,
