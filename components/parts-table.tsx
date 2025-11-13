@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Part, ScadaObject } from "@/lib/supabase/models";
+import { Part, ScadaObject, LexiconItem } from "@/lib/supabase/models";
 import {
   Table,
   TableBody,
@@ -42,7 +42,8 @@ import { cn } from "@/lib/utils";
 import { useParts } from "@/lib/hooks/useParts";
 import { useProjects } from "@/lib/hooks/useProjects";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import { objectService } from "@/lib/services";
+import { objectService, lexiconService } from "@/lib/services";
+import { useOrganization } from "@clerk/nextjs";
 import {
   DndContext,
   closestCenter,
@@ -74,7 +75,7 @@ interface EditingCell {
 }
 
 interface NavigationDialog {
-  type: "project" | "object";
+  type: "project" | "object" | "lexicon";
   id: number;
   name: string;
 }
@@ -183,6 +184,7 @@ export function PartsTable({
 }: PartsTableProps) {
   const router = useRouter();
   const { supabase } = useSupabase();
+  const { organization } = useOrganization();
   const { parts, createPart, updatePart, deletePart, loading } = useParts({
     projectId,
     objectId,
@@ -194,6 +196,7 @@ export function PartsTable({
     { id: "part_number", label: "Part Number", defaultWidth: 150 },
     { id: "description", label: "Description", defaultWidth: 250 },
     { id: "quantity", label: "Quantity", align: "center", defaultWidth: 100 },
+    { id: "lexicon", label: "Lexicon Part", defaultWidth: 180 },
     ...(showProjectColumn ? [{ id: "project", label: "Project", defaultWidth: 180 }] : []),
     ...(showObjectColumn ? [{ id: "object", label: "Object", defaultWidth: 180 }] : []),
     { id: "ordered", label: "Ordered", align: "center" as const, defaultWidth: 120 },
@@ -213,8 +216,24 @@ export function PartsTable({
   const [partToDelete, setPartToDelete] = useState<number | null>(null);
   const [navigationDialog, setNavigationDialog] = useState<NavigationDialog | null>(null);
   const [objects, setObjects] = useState<Record<number, ScadaObject>>({});
+  const [lexiconItems, setLexiconItems] = useState<Record<number, LexiconItem>>({});
+  const [availablePartLexicons, setAvailablePartLexicons] = useState<LexiconItem[]>([]);
 
-  const [newPart, setNewPart] = useState({
+  const [newPart, setNewPart] = useState<{
+    part_number: string;
+    description: string;
+    quantity: number;
+    project_id: number;
+    object_id: number | null;
+    lexicon_item_id: number | null;
+    comments: string;
+    ordered: boolean;
+    ordered_date: string | null;
+    received: boolean;
+    received_date: string | null;
+    delivered: boolean;
+    delivered_date: string | null;
+  }>({
     part_number: "",
     description: "",
     quantity: 1,
@@ -307,6 +326,51 @@ export function PartsTable({
     fetchObjects();
   }, [parts, supabase]);
 
+  // Fetch lexicon items for parts that have lexicon_item_id
+  useEffect(() => {
+    async function fetchLexiconItems() {
+      if (!supabase) return;
+
+      const lexiconIds = parts
+        .filter(part => part.lexicon_item_id)
+        .map(part => part.lexicon_item_id as number);
+
+      if (lexiconIds.length === 0) return;
+
+      try {
+        const uniqueLexiconIds = Array.from(new Set(lexiconIds));
+        const fetchedLexicons = await lexiconService.getLexiconItemsByIds(supabase, uniqueLexiconIds);
+
+        const lexiconMap: Record<number, LexiconItem> = {};
+        fetchedLexicons.forEach(item => {
+          lexiconMap[item.id] = item;
+        });
+
+        setLexiconItems(lexiconMap);
+      } catch (error) {
+        console.error("Failed to fetch lexicon items:", error);
+      }
+    }
+
+    fetchLexiconItems();
+  }, [parts, supabase]);
+
+  // Fetch available part lexicon items for selector
+  useEffect(() => {
+    async function fetchPartLexicons() {
+      if (!supabase || !organization?.id) return;
+
+      try {
+        const items = await lexiconService.getLexiconItemsByType(supabase, organization.id, 'part');
+        setAvailablePartLexicons(items);
+      } catch (error) {
+        console.error("Failed to fetch part lexicons:", error);
+      }
+    }
+
+    fetchPartLexicons();
+  }, [supabase, organization?.id]);
+
   // Filter parts based on search query
   const filteredParts = useMemo(() => {
     if (!searchQuery) return parts;
@@ -315,16 +379,18 @@ export function PartsTable({
     return parts.filter(part => {
       const projectName = projects.find(p => p.id === part.project_id)?.name?.toLowerCase() || "";
       const objectName = part.object_id ? objects[part.object_id]?.title?.toLowerCase() || "" : "";
+      const lexiconName = part.lexicon_item_id ? lexiconItems[part.lexicon_item_id]?.name?.toLowerCase() || "" : "";
 
       return (
         part.part_number.toLowerCase().includes(query) ||
         part.description.toLowerCase().includes(query) ||
         part.comments?.toLowerCase().includes(query) ||
         projectName.includes(query) ||
-        objectName.includes(query)
+        objectName.includes(query) ||
+        lexiconName.includes(query)
       );
     });
-  }, [parts, searchQuery, projects, objects]);
+  }, [parts, searchQuery, projects, objects, lexiconItems]);
 
   const handleCellClick = (partId: number, field: keyof Part, currentValue: unknown) => {
     setEditingCell({ partId, field });
@@ -404,7 +470,7 @@ export function PartsTable({
     }
   };
 
-  const handleNavigationClick = (type: "project" | "object", id: number, name: string) => {
+  const handleNavigationClick = (type: "project" | "object" | "lexicon", id: number, name: string) => {
     setNavigationDialog({ type, id, name });
   };
 
@@ -412,14 +478,32 @@ export function PartsTable({
     if (navigationDialog) {
       if (navigationDialog.type === "project") {
         router.push(`/projects/${navigationDialog.id}`);
-      } else {
+      } else if (navigationDialog.type === "object") {
         // Find the project_id for this object
         const part = parts.find(p => p.object_id === navigationDialog.id);
         if (part) {
           router.push(`/projects/${part.project_id}/objects/${navigationDialog.id}`);
         }
+      } else if (navigationDialog.type === "lexicon") {
+        router.push(`/lexicon/${navigationDialog.id}`);
       }
       setNavigationDialog(null);
+    }
+  };
+
+  const handleLexiconSelect = (lexiconId: number) => {
+    const lexicon = availablePartLexicons.find(l => l.id === lexiconId);
+    if (lexicon && lexicon.attributes) {
+      // Inherit information from lexicon item
+      const attrs = lexicon.attributes as { part_number?: string; description?: string };
+      setNewPart({
+        ...newPart,
+        lexicon_item_id: lexiconId,
+        part_number: attrs.part_number || "",
+        description: attrs.description || "",
+      });
+    } else {
+      setNewPart({ ...newPart, lexicon_item_id: lexiconId });
     }
   };
 
@@ -475,6 +559,58 @@ export function PartsTable({
                 min="1"
                 className="h-8 w-20"
               />
+            </TableCell>
+          );
+        case "lexicon":
+          return (
+            <TableCell key={columnId} className={cellClass} style={cellStyle}>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="h-8 w-full justify-between">
+                    {newPart.lexicon_item_id
+                      ? availablePartLexicons.find((l) => l.id === newPart.lexicon_item_id)?.name
+                      : "Select lexicon part"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search lexicon parts..." />
+                    <CommandList>
+                      <CommandEmpty>No lexicon part found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => setNewPart({ ...newPart, lexicon_item_id: null })}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              !newPart.lexicon_item_id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          None (Manual Entry)
+                        </CommandItem>
+                        {availablePartLexicons.map((lexicon) => (
+                          <CommandItem
+                            key={lexicon.id}
+                            value={lexicon.name}
+                            onSelect={() => handleLexiconSelect(lexicon.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                newPart.lexicon_item_id === lexicon.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {lexicon.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </TableCell>
           );
         case "project":
@@ -616,6 +752,25 @@ export function PartsTable({
               />
             ) : (
               part.quantity
+            )}
+          </TableCell>
+        );
+      case "lexicon":
+        return (
+          <TableCell key={columnId} className={cellClass} style={cellStyle}>
+            {part.lexicon_item_id && lexiconItems[part.lexicon_item_id] ? (
+              <Button
+                variant="link"
+                className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800"
+                onClick={() =>
+                  handleNavigationClick("lexicon", part.lexicon_item_id!, lexiconItems[part.lexicon_item_id!].name)
+                }
+              >
+                {lexiconItems[part.lexicon_item_id].name}
+                <ExternalLink className="ml-1 h-3 w-3" />
+              </Button>
+            ) : (
+              "-"
             )}
           </TableCell>
         );
@@ -807,7 +962,7 @@ export function PartsTable({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Go to {navigationDialog?.type === "project" ? "Project" : "Object"}
+              Go to {navigationDialog?.type === "project" ? "Project" : navigationDialog?.type === "object" ? "Object" : "Lexicon Item"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Would you like to navigate to {navigationDialog?.name}?
@@ -816,7 +971,7 @@ export function PartsTable({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleNavigationConfirm}>
-              Go to {navigationDialog?.type === "project" ? "Project" : "Object"}
+              Go to {navigationDialog?.type === "project" ? "Project" : navigationDialog?.type === "object" ? "Object" : "Lexicon Item"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
