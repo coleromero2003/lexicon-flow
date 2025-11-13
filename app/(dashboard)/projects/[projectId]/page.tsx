@@ -13,8 +13,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PriorityBadge } from "@/components/ui/priority-badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { PageLoadingSkeleton } from "@/components/ui/page-loading-skeleton";
+import { PageErrorState } from "@/components/ui/page-error-state";
+import { SearchInput } from "@/components/ui/search-input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
@@ -30,7 +32,6 @@ import {
   ListTree,
   MoreVertical,
   Pencil,
-  Search,
   Share2,
   Trash2,
   Workflow as WorkflowIcon,
@@ -266,26 +267,8 @@ export default function ProjectDashboardPage() {
     }
   };
 
-  function renderLoadingState() {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-10 w-full max-w-md" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-          </div>
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-        </main>
-      </div>
-    );
-  }
-
   if (loading) {
-    return renderLoadingState();
+    return <PageLoadingSkeleton statsCount={3} />;
   }
 
   if (!organization) {
@@ -303,19 +286,12 @@ export default function ProjectDashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <EmptyState
-            title="Unable to load project dashboard"
-            description={error}
-            action={
-              <Button variant="outline" onClick={() => router.refresh()}>
-                Try again
-              </Button>
-            }
-          />
-        </main>
-      </div>
+      <PageErrorState
+        title="Unable to load project dashboard"
+        message={error}
+        onRetry={() => router.refresh()}
+        retryLabel="Try again"
+      />
     );
   }
 
@@ -381,15 +357,12 @@ export default function ProjectDashboardPage() {
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search workflows, objects, and files"
-              className="pl-9"
-            />
-          </div>
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search workflows, objects, and files"
+            className="w-full max-w-xl"
+          />
           {hasSearch && (
             <Button variant="ghost" onClick={() => setSearchQuery("")}>
               Clear search

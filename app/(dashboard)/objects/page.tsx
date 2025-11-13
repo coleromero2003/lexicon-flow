@@ -3,12 +3,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useOrganization, useUser } from "@clerk/nextjs";
+import { useOrganization } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { PriorityBadge } from "@/components/ui/priority-badge";
@@ -19,17 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
 import { Project, ScadaObject, ObjectPriority } from "@/lib/supabase/models";
 import {
   ListTree,
-  Search,
   Filter,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useAuthRedirect } from "@/lib/hooks/useAuthRedirect";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageLoadingSkeleton } from "@/components/ui/page-loading-skeleton";
+import { PageErrorState } from "@/components/ui/page-error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SearchInput } from "@/components/ui/search-input";
 
 type ObjectWithProject = ScadaObject & {
   projects?: {
@@ -40,7 +43,7 @@ type ObjectWithProject = ScadaObject & {
 
 export default function AllObjectsPage() {
   const router = useRouter();
-  const { isSignedIn, isLoaded: userLoaded } = useUser();
+  const { isSignedIn, userLoaded } = useAuthRedirect();
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
 
@@ -52,12 +55,6 @@ export default function AllObjectsPage() {
   const [filterPriority, setFilterPriority] = useState<ObjectPriority | "all">("all");
   const [filterProject, setFilterProject] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
-
-  useEffect(() => {
-    if (userLoaded && !isSignedIn) {
-      router.push("/sign-in");
-    }
-  }, [isSignedIn, userLoaded, router]);
 
   useEffect(() => {
     if (!supabase || !organization) {
@@ -136,21 +133,7 @@ export default function AllObjectsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-10 w-full max-w-md" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-          </div>
-          <Skeleton className="h-64" />
-        </main>
-      </div>
-    );
+    return <PageLoadingSkeleton statsCount={4} />;
   }
 
   if (!organization) {
@@ -159,63 +142,47 @@ export default function AllObjectsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Error loading objects
-            </h2>
-            <p className="text-gray-600">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={() => router.push("/dashboard")}>
-              Back to Dashboard
-            </Button>
-          </div>
-        </main>
-      </div>
+      <PageErrorState
+        title="Error loading objects"
+        message={error}
+        onRetry={() => router.push("/dashboard")}
+        retryLabel="Back to Dashboard"
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                All Objects
-              </h1>
-              <p className="text-gray-600">
-                View and manage all SCADA objects across your organization.
-              </p>
-            </div>
-            <div className="flex gap-2 mt-4 sm:mt-0">
-              <Button
-                variant={showFilters ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                {showFilters ? "Hide Filters" : "Show Filters"}
+    <PageContainer>
+      <PageHeader
+        title="All Objects"
+        description="View and manage all SCADA objects across your organization."
+        actions={
+          <>
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide Filters" : "Show Filters"}
+            </Button>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
               </Button>
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-2" />
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          </div>
+            )}
+          </>
+        }
+      />
 
-          {/* Search Bar */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search objects by title or description..."
-              className="pl-9"
-            />
-          </div>
+      {/* Search Bar */}
+      <SearchInput
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search objects by title or description..."
+        className="mb-4"
+      />
 
           {/* Filters */}
           {showFilters && (
@@ -269,9 +236,8 @@ export default function AllObjectsPage() {
               </CardContent>
             </Card>
           )}
-        </div>
 
-        {/* Stats */}
+      {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
@@ -373,7 +339,6 @@ export default function AllObjectsPage() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </PageContainer>
   );
 }

@@ -2,32 +2,23 @@
 
 import { Package } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PartsTable } from "@/components/parts-table";
 import { useParts } from "@/lib/hooks/useParts";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageLoadingSkeleton } from "@/components/ui/page-loading-skeleton";
+import { PageErrorState } from "@/components/ui/page-error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 export default function PartsPage() {
   const { parts, loading, error } = useParts();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <Skeleton className="h-10 w-64 mb-6" />
-          <Skeleton className="h-96 w-full" />
-        </main>
-      </div>
-    );
+    return <PageLoadingSkeleton statsCount={5} />;
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center text-red-600">Error: {error}</div>
-        </main>
-      </div>
-    );
+    return <PageErrorState message={error} />;
   }
 
   // Calculate stats
@@ -38,56 +29,45 @@ export default function PartsPage() {
   const deliveredParts = parts.filter(p => p.delivered).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Package className="h-8 w-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Parts</h1>
-            </div>
+    <PageContainer>
+      <PageHeader
+        title={
+          <div className="flex items-center gap-2">
+            <Package className="h-8 w-8 text-blue-600" />
+            <span>Parts</span>
           </div>
-        </div>
+        }
+        description="Manage all parts across all projects in your organization."
+      />
 
-        {/* Description */}
-        <p className="text-gray-600 mb-6">
-          Manage all parts across all projects in your organization.
-        </p>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Parts</CardDescription>
-              <CardTitle className="text-3xl">{totalParts}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Quantity</CardDescription>
-              <CardTitle className="text-3xl">{totalQuantity}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Ordered</CardDescription>
-              <CardTitle className="text-3xl">{orderedParts}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Received</CardDescription>
-              <CardTitle className="text-3xl">{receivedParts}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Delivered</CardDescription>
-              <CardTitle className="text-3xl">{deliveredParts}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <StatCard
+          label="Total Parts"
+          value={totalParts}
+          variant="compact"
+        />
+        <StatCard
+          label="Total Quantity"
+          value={totalQuantity}
+          variant="compact"
+        />
+        <StatCard
+          label="Ordered"
+          value={orderedParts}
+          variant="compact"
+        />
+        <StatCard
+          label="Received"
+          value={receivedParts}
+          variant="compact"
+        />
+        <StatCard
+          label="Delivered"
+          value={deliveredParts}
+          variant="compact"
+        />
+      </div>
 
         {/* Parts Table */}
         <Card>
@@ -101,7 +81,6 @@ export default function PartsPage() {
             <PartsTable showProjectColumn={true} showObjectColumn={true} />
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </PageContainer>
   );
 }

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Plus, ListTodo, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TasksTable } from "@/components/tasks/tasks-table";
 import { AddTaskDialog } from "@/components/objects/add-task-dialog";
 import { EditTaskDialog } from "@/components/objects/edit-task-dialog";
@@ -18,6 +17,11 @@ import { Task, ObjectPriority, ScadaObject } from "@/lib/supabase/models";
 import { Badge } from "@/components/ui/badge";
 import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/lib/email/task-notification-helpers";
 import { objectService, taskService } from "@/lib/services";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageLoadingSkeleton } from "@/components/ui/page-loading-skeleton";
+import { PageErrorState } from "@/components/ui/page-error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
 
 export default function TasksPage() {
   const { organization, membership } = useOrganization();
@@ -184,35 +188,21 @@ export default function TasksPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <Skeleton className="h-10 w-64 mb-6" />
-          <Skeleton className="h-96 w-full" />
-        </main>
-      </div>
-    );
+    return <PageLoadingSkeleton statsCount={3} />;
   }
 
   if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center text-red-600">Error: {error}</div>
-        </main>
-      </div>
-    );
+    return <PageErrorState message={error} />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <PageContainer>
+      <PageHeader
+        title={
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <ListTodo className="h-8 w-8 text-blue-600" />
-              <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
+              <span>Tasks</span>
             </div>
             {isAdmin && (
               <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300">
@@ -221,44 +211,38 @@ export default function TasksPage() {
               </Badge>
             )}
           </div>
+        }
+        description={
+          isAdmin
+            ? "View and manage all tasks in your organization."
+            : "View and manage tasks assigned to you."
+        }
+        actions={
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
-        </div>
+        }
+      />
 
-        {/* Description */}
-        <p className="text-gray-600 mb-6">
-          {isAdmin
-            ? "View and manage all tasks in your organization."
-            : "View and manage tasks assigned to you."}
-        </p>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Tasks</CardDescription>
-              <CardTitle className="text-3xl">{tasks.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Active Tasks</CardDescription>
-              <CardTitle className="text-3xl">
-                {tasks.filter((t) => !t.is_done).length}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Completed Tasks</CardDescription>
-              <CardTitle className="text-3xl">
-                {tasks.filter((t) => t.is_done).length}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <StatCard
+          label="Total Tasks"
+          value={tasks.length}
+          variant="compact"
+        />
+        <StatCard
+          label="Active Tasks"
+          value={tasks.filter((t) => !t.is_done).length}
+          variant="compact"
+        />
+        <StatCard
+          label="Completed Tasks"
+          value={tasks.filter((t) => t.is_done).length}
+          variant="compact"
+        />
+      </div>
 
         {/* Tasks Table */}
         <Card>
@@ -285,7 +269,6 @@ export default function TasksPage() {
             />
           </CardContent>
         </Card>
-      </main>
 
       {/* Dialogs */}
       <AddTaskDialog
@@ -316,6 +299,6 @@ export default function TasksPage() {
         onSubmit={handleLinkToObject}
         isLoadingObjects={isLoadingObjects}
       />
-    </div>
+    </PageContainer>
   );
 }
