@@ -89,13 +89,7 @@ export function useObjectRelations(objectId: number) {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const { error } = await supabase
-          .from("object_relations")
-          .delete()
-          .eq("id", relationId);
-
-        if (error) throw error;
-
+        await objectRelationService.deleteRelation(supabase, relationId);
         setRelations((prev) => prev.filter((r) => r.relation.id !== relationId));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to delete relation");

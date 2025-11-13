@@ -520,6 +520,17 @@ export const objectRelationService = {
     if (error) throw error;
     return data;
   },
+
+  async deleteRelation(
+    supabase: SupabaseClient,
+    relationId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("object_relations")
+      .delete()
+      .eq("id", relationId);
+    if (error) throw error;
+  },
 };
 
 // =======================
@@ -785,6 +796,19 @@ export const objectFileService = {
     if (error) throw error;
     return data || [];
   },
+
+  async unlinkFile(
+    supabase: SupabaseClient,
+    objectId: number,
+    fileId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("object_files")
+      .delete()
+      .eq("object_id", objectId)
+      .eq("file_id", fileId);
+    if (error) throw error;
+  },
 };
 
 // =======================
@@ -839,6 +863,33 @@ export const objectLexiconService = {
       .in("object_id", uniqueIds);
     if (error) throw error;
     return data || [];
+  },
+
+  async unlinkLexiconItem(
+    supabase: SupabaseClient,
+    objectId: number,
+    lexiconId: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("object_lexicon_links")
+      .delete()
+      .eq("object_id", objectId)
+      .eq("lexicon_id", lexiconId);
+    if (error) throw error;
+  },
+
+  async updateLexiconNote(
+    supabase: SupabaseClient,
+    objectId: number,
+    lexiconId: number,
+    note: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("object_lexicon_links")
+      .update({ note })
+      .eq("object_id", objectId)
+      .eq("lexicon_id", lexiconId);
+    if (error) throw error;
   },
 };
 

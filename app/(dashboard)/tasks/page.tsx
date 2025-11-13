@@ -17,6 +17,7 @@ import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { Task, ObjectPriority, ScadaObject } from "@/lib/supabase/models";
 import { Badge } from "@/components/ui/badge";
 import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/lib/email/task-notification-helpers";
+import { objectService, taskService } from "@/lib/services";
 
 export default function TasksPage() {
   const { organization, membership } = useOrganization();
@@ -43,40 +44,21 @@ export default function TasksPage() {
 
   // Load all objects in the organization for linking
   const loadObjects = useCallback(async () => {
-    if (!supabase || !organization) return;
+    if (!supabase) return;
 
     try {
       setIsLoadingObjects(true);
-      // Get all projects and their objects
-      const { data: projects, error: projectsError } = await supabase
-        .from("projects")
-        .select("id")
-        .eq("org_id", organization.id);
-
-      if (projectsError) throw projectsError;
-
-      if (!projects || projects.length === 0) {
-        setAllObjects([]);
-        return;
-      }
-
-      const projectIds = projects.map((p) => p.id);
-      const { data: objects, error: objectsError } = await supabase
-        .from("objects")
-        .select("*")
-        .in("project_id", projectIds)
-        .order("title");
-
-      if (objectsError) throw objectsError;
-
-      setAllObjects(objects || []);
+      const objects = await objectService.getObjectsByOrganization(supabase);
+      // Sort by title for better UX in the link dialog
+      const sortedObjects = objects.sort((a, b) => a.title.localeCompare(b.title));
+      setAllObjects(sortedObjects);
     } catch (err) {
       console.error("Failed to load objects", err);
       toast.error("Failed to load objects");
     } finally {
       setIsLoadingObjects(false);
     }
-  }, [supabase, organization]);
+  }, [supabase]);
 
   useEffect(() => {
     loadObjects();
@@ -97,23 +79,17 @@ export default function TasksPage() {
     try {
       if (!supabase) throw new Error("Supabase client not initialized");
 
-      const { data: newTask, error } = await supabase
-        .from("tasks")
-        .insert({
-          org_id: organization.id,
-          object_id: null, // Standalone task
-          title: task.title,
-          details: task.details || null,
-          assignee: task.assignee || [],
-          due_date: task.dueDate ? task.dueDate.toISOString().split("T")[0] : null,
-          priority: task.priority || "medium",
-          is_done: false,
-          sort_order: 0,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const newTask = await taskService.createTask(supabase, {
+        org_id: organization.id,
+        object_id: null, // Standalone task
+        title: task.title,
+        details: task.details || null,
+        assignee: task.assignee || [],
+        due_date: task.dueDate ? task.dueDate.toISOString().split("T")[0] : null,
+        priority: task.priority || "medium",
+        is_done: false,
+        sort_order: 0,
+      });
 
       toast.success("Task created successfully");
 
