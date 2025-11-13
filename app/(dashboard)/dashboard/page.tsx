@@ -16,6 +16,7 @@ import { NoOrganizationState } from "@/components/ui/no-organization-state";
 import { PageErrorBoundary } from "@/components/ui/page-error-boundary";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjects } from "@/lib/hooks/useProjects";
+import { useAuthRedirect } from "@/lib/hooks/useAuthRedirect";
 import { useOrganization, useUser } from "@clerk/nextjs";
 import {
   BookOpen,
@@ -27,7 +28,6 @@ import {
   List,
   Plus,
   Rocket,
-  Search,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,6 +35,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import type { ScadaObject, ObjectSubtask } from "@/lib/supabase/models";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatCard } from "@/components/ui/stat-card";
+import { SearchInput } from "@/components/ui/search-input";
+import { sanitizePlainText, sanitizeProjectCode, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/utils/validation";
 
 type ObjectWithProject = ScadaObject & {
   projects: {
@@ -44,8 +48,6 @@ type ObjectWithProject = ScadaObject & {
   };
 };
 
-const MAX_NAME_LENGTH = 100;
-const MAX_DESCRIPTION_LENGTH = 500;
 const CODE_PATTERN = /^[A-Za-z0-9_-]{0,20}$/;
 
 type Filters = {
@@ -63,14 +65,6 @@ const createDefaultFilters = (): Filters => ({
     end: null,
   },
 });
-
-const sanitizePlainText = (value: string) =>
-  value
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim();
-
-const sanitizeProjectCode = (value: string) => sanitizePlainText(value);
 
 function DashboardErrorFallback() {
   return (
@@ -90,7 +84,8 @@ function DashboardErrorFallback() {
 
 function ProjectsPageContent() {
   const router = useRouter();
-  const { isSignedIn, isLoaded: userLoaded, user } = useUser();
+  const { isSignedIn, userLoaded } = useAuthRedirect();
+  const { user } = useUser();
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
   const { createProject, projects, error, loading, reload } = useProjects();
@@ -102,12 +97,6 @@ function ProjectsPageContent() {
   const [assignedObjects, setAssignedObjects] = useState<ObjectWithProject[]>([]);
   const [assignedTasks, setAssignedTasks] = useState<ObjectSubtask[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
-
-  useEffect(() => {
-    if (userLoaded && !isSignedIn) {
-      router.push("/sign-in");
-    }
-  }, [isSignedIn, userLoaded, router]);
 
   useEffect(() => {
     if (!isCreatingProject) {
@@ -366,101 +355,57 @@ function ProjectsPageContent() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 pb-10 pt-6 lg:p-8">
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        <div className="space-y-6">
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="mb-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-                Dashboard for {organization.name}
-              </h1>
-              <p className="text-gray-600">
-                Overview your SCADA projects and workflows.
-              </p>
-            </div>
+        <PageHeader
+          title={`Dashboard for ${organization.name}`}
+          description="Overview your SCADA projects and workflows."
+          actions={
             <Link href="/lexicon">
-              <Button variant="outline" size="sm" className="mt-4 sm:mt-0">
+              <Button variant="outline" size="sm">
                 <BookOpen className="mr-2 h-4 w-4" />
                 Manage Lexicon
               </Button>
             </Link>
-          </div>
-        </div>
+          }
+        />
 
         <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600 sm:text-sm">
-                    Total Projects
-                  </p>
-                  <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                    {projects.length}
-                  </p>
-                </div>
-                <div className="rounded-full bg-blue-100 p-3 text-blue-600">
-                  <Rocket className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Total Projects"
+            value={projects.length}
+            icon={Rocket}
+            iconColor="text-blue-600"
+            iconBgColor="bg-blue-100"
+          />
 
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600 sm:text-sm">
-                    Active Filters
-                  </p>
-                  <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                    {filters.search ||
-                    filters.dateRange.start ||
-                    filters.dateRange.end
-                      ? 1
-                      : 0}
-                  </p>
-                </div>
-                <div className="rounded-full bg-blue-100 p-3 text-blue-600">
-                  <Filter className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Active Filters"
+            value={
+              filters.search ||
+              filters.dateRange.start ||
+              filters.dateRange.end
+                ? 1
+                : 0
+            }
+            icon={Filter}
+            iconColor="text-blue-600"
+            iconBgColor="bg-blue-100"
+          />
 
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600 sm:text-sm">
-                    Grid View
-                  </p>
-                  <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                    {viewMode === "grid" ? "On" : "Off"}
-                  </p>
-                </div>
-                <div className="rounded-full bg-blue-100 p-3 text-blue-600">
-                  <Grid3x3 className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Grid View"
+            value={viewMode === "grid" ? "On" : "Off"}
+            icon={Grid3x3}
+            iconColor="text-blue-600"
+            iconBgColor="bg-blue-100"
+          />
 
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-600 sm:text-sm">
-                    List View
-                  </p>
-                  <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                    {viewMode === "list" ? "On" : "Off"}
-                  </p>
-                </div>
-                <div className="rounded-full bg-blue-100 p-3 text-blue-600">
-                  <List className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="List View"
+            value={viewMode === "list" ? "On" : "Off"}
+            icon={List}
+            iconColor="text-blue-600"
+            iconBgColor="bg-blue-100"
+          />
         </div>
 
         {/* User Assignments Section */}
@@ -588,21 +533,12 @@ function ProjectsPageContent() {
         )}
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              data-testid="project-search-input"
-              placeholder="Search projects..."
-              className="pl-10"
-              value={filters.search}
-              onChange={(event) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  search: event.target.value,
-                }))
-              }
-            />
-          </div>
+          <SearchInput
+            value={filters.search}
+            onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+            placeholder="Search projects..."
+            className="w-full lg:max-w-md"
+          />
           <div className="flex flex-wrap gap-2">
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}

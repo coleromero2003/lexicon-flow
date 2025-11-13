@@ -54,14 +54,7 @@ export function useObjectFiles(objectId: number) {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const { error } = await supabase
-          .from("object_files")
-          .delete()
-          .eq("object_id", objectId)
-          .eq("file_id", fileId);
-
-        if (error) throw error;
-
+        await objectFileService.unlinkFile(supabase, objectId, fileId);
         setFiles((prev) => prev.filter((f) => f.id !== fileId));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to unlink file");

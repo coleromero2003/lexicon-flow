@@ -82,14 +82,7 @@ export function useObjectLexicon(objectId: number) {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const { error } = await supabase
-          .from("object_lexicon_links")
-          .delete()
-          .eq("object_id", objectId)
-          .eq("lexicon_id", lexiconId);
-
-        if (error) throw error;
-
+        await objectLexiconService.unlinkLexiconItem(supabase, objectId, lexiconId);
         setLexiconLinks((prev) =>
           prev.filter((l) => l.link.lexicon_id !== lexiconId)
         );
@@ -108,14 +101,7 @@ export function useObjectLexicon(objectId: number) {
       if (!supabase) throw new Error("Supabase client not initialized");
 
       try {
-        const { error } = await supabase
-          .from("object_lexicon_links")
-          .update({ note })
-          .eq("object_id", objectId)
-          .eq("lexicon_id", lexiconId);
-
-        if (error) throw error;
-
+        await objectLexiconService.updateLexiconNote(supabase, objectId, lexiconId, note);
         setLexiconLinks((prev) =>
           prev.map((l) =>
             l.link.lexicon_id === lexiconId

@@ -19,18 +19,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageHeader } from "@/components/ui/page-header";
+import { sanitizePlainText, sanitizeProjectCode, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/utils/validation";
 
-const MAX_NAME_LENGTH = 100;
-const MAX_DESCRIPTION_LENGTH = 500;
 const CODE_PATTERN = /^[A-Za-z0-9_-]{0,20}$/;
-
-const sanitizePlainText = (value: string) =>
-  value
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim();
-
-const sanitizeProjectCode = (value: string) => sanitizePlainText(value);
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -182,32 +175,26 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-4 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-8">
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 text-center sm:text-left">
-              <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">Projects</h1>
-              <p className="text-gray-600">
-                Explore all of your SCADA projects. Select a project card to view its
-                detailed dashboard.
-              </p>
-            </div>
-            {organization && (
+    <PageContainer>
+      <div className="mx-auto flex max-w-6xl flex-col gap-8">
+        <PageHeader
+          title="Projects"
+          description="Explore all of your SCADA projects. Select a project card to view its detailed dashboard."
+          actions={
+            organization && (
               <Button
                 onClick={() => setIsCreatingProject(true)}
                 size="sm"
-                className="self-center sm:self-auto"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 New Project
               </Button>
-            )}
-          </header>
+            )
+          }
+        />
 
-          {content}
-        </div>
-      </main>
+        {content}
+      </div>
 
       {/* Create Project Dialog */}
       <Dialog
@@ -272,6 +259,6 @@ export default function ProjectsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

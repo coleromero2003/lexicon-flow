@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useOrganization, useUser } from "@clerk/nextjs";
+import { useOrganization } from "@clerk/nextjs";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
 import { objectService, projectService } from "@/lib/services";
@@ -33,26 +32,26 @@ import { trackScadaOperation } from "@/lib/sentry";
 import { Project, ScadaObject, ObjectPriority } from "@/lib/supabase/models";
 import {
   ListTree,
-  Search,
   Plus,
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuthRedirect } from "@/lib/hooks/useAuthRedirect";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageLoadingSkeleton } from "@/components/ui/page-loading-skeleton";
+import { PageErrorState } from "@/components/ui/page-error-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { SearchInput } from "@/components/ui/search-input";
+import { sanitizePlainText } from "@/lib/utils/validation";
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 1000;
-
-const sanitizePlainText = (value: string) =>
-  value
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\r\n\t]+/g, " ")
-    .trim();
 
 export default function ObjectsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const router = useRouter();
   const projectIdNum = Number(projectId);
-  const { isSignedIn, isLoaded: userLoaded } = useUser();
+  const { isSignedIn, userLoaded } = useAuthRedirect();
   const { organization } = useOrganization();
   const { supabase } = useSupabase();
 
@@ -64,12 +63,6 @@ export default function ObjectsPage() {
   const [isCreatingObject, setIsCreatingObject] = useState(false);
   const [isSubmittingObject, setIsSubmittingObject] = useState(false);
   const formRef = React.useRef<HTMLFormElement>(null);
-
-  useEffect(() => {
-    if (userLoaded && !isSignedIn) {
-      router.push("/sign-in");
-    }
-  }, [isSignedIn, userLoaded, router]);
 
   useEffect(() => {
     if (!supabase || !organization || Number.isNaN(projectIdNum)) {
@@ -205,20 +198,7 @@ export default function ObjectsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8 space-y-6">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-10 w-full max-w-md" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
-          </div>
-          <Skeleton className="h-64" />
-        </main>
-      </div>
-    );
+    return <PageLoadingSkeleton statsCount={3} />;
   }
 
   if (!organization) {
@@ -227,58 +207,41 @@ export default function ObjectsPage() {
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {error ? "Error loading objects" : "Project not found"}
-            </h2>
-            <p className="text-gray-600">{error || "We couldn't find the requested project."}</p>
-            <Button variant="outline" className="mt-4" onClick={() => router.push("/dashboard")}>
-              Back to Dashboard
-            </Button>
-          </div>
-        </main>
-      </div>
+      <PageErrorState
+        title={error ? "Error loading objects" : "Project not found"}
+        message={error || "We couldn't find the requested project."}
+        onRetry={() => router.push("/dashboard")}
+        retryLabel="Back to Dashboard"
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-                Objects for {project.name}
-              </h1>
-              <p className="text-gray-600">
-                Manage SCADA objects and their relationships.
-              </p>
-            </div>
-            <div className="flex gap-2 mt-4 sm:mt-0">
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-              <Button size="sm" onClick={() => setIsCreatingObject(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Object
-              </Button>
-            </div>
-          </div>
+    <PageContainer>
+      <PageHeader
+        title={`Objects for ${project.name}`}
+        description="Manage SCADA objects and their relationships."
+        actions={
+          <>
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+            <Button size="sm" onClick={() => setIsCreatingObject(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Object
+            </Button>
+          </>
+        }
+      />
 
-          {/* Search Bar */}
-          <div className="relative mb-6">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search objects..."
-              className="pl-9"
-            />
-          </div>
-        </div>
+      {/* Search Bar */}
+      <SearchInput
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search objects..."
+        className="mb-6"
+      />
 
         {/* Stats */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 mb-6">
@@ -375,7 +338,6 @@ export default function ObjectsPage() {
             )}
           </CardContent>
         </Card>
-      </main>
 
       {/* Create Object Dialog */}
       <Dialog open={isCreatingObject} onOpenChange={setIsCreatingObject}>
@@ -440,6 +402,6 @@ export default function ObjectsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }
