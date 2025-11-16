@@ -5,7 +5,7 @@
 <div align="center">
   <br />
   <div>
-    <img src="https://img.shields.io/badge/-Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
+    <img src="https://img.shields.io/badge/-Next.js_16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
     <img src="https://img.shields.io/badge/-React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
     <img src="https://img.shields.io/badge/-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
     <img src="https://img.shields.io/badge/-Clerk-0072CE?style=for-the-badge&logo=clerk&logoColor=white" alt="Clerk" />
@@ -32,12 +32,15 @@
 7. [Testing](#-testing)
 8. [Deployment](#-deployment)
 9. [MCP Integration](#-mcp-integration)
+10. [Contributing](#-contributing)
+11. [Security](#-security)
+12. [License](#-license)
 
 ---
 
 ## 🚀 Introduction
 
-**Lexicon Flow** is a comprehensive project management platform designed for SCADA (Supervisory Control and Data Acquisition) systems and industrial automation projects. It combines the intuitive task management of Trello with advanced features specifically tailored for managing complex industrial control systems.
+**Lexicon Flow** is a comprehensive, open-source project management platform designed for SCADA (Supervisory Control and Data Acquisition) systems and industrial automation projects. It combines the intuitive task management of Trello with advanced features specifically tailored for managing complex industrial control systems.
 
 ### What Makes Lexicon Flow Unique?
 
@@ -95,7 +98,7 @@
 ## ⚙️ Tech Stack
 
 ### Frontend
-* **Next.js 15** - React framework with App Router and Server Components
+* **Next.js 16** - React framework with App Router and Server Components
 * **React 19** - Latest React with enhanced performance
 * **TypeScript** - Type-safe development
 * **TailwindCSS 4** - Utility-first styling
@@ -111,9 +114,11 @@
 
 ### Development & Testing
 * **Vitest** - Fast unit testing framework
+* **Playwright** - End-to-end testing with Clerk authentication
 * **Testing Library** - React component testing
 * **Supabase CLI** - Local development and migrations
 * **ESLint** - Code linting
+* **Sentry** - Error monitoring and performance tracking
 * **MCP Servers** - Enhanced development with Supabase and Vercel MCP integrations
 
 ---
@@ -189,7 +194,7 @@ All database operations go through a service layer ([lib/services.ts](lib/servic
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/lexicon-flow.git
+   git clone https://github.com/coleromero2003/lexicon-flow.git
    cd lexicon-flow
    ```
 
@@ -362,7 +367,7 @@ The local instance is configured via `.env.test` with separate credentials from 
 
 The easiest way to deploy is using Vercel:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/yourusername/lexicon-flow)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/coleromero2003/lexicon-flow)
 
 1. Click "Deploy" and connect your GitHub repository
 2. Configure environment variables in Vercel dashboard:
@@ -504,6 +509,154 @@ mcp supabase merge_branch --branch-id <id>
 # Or reset if something went wrong
 mcp supabase reset_branch --branch-id <id>
 ```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions to Lexicon Flow! Whether you're fixing bugs, adding new features, or improving documentation, your help is appreciated.
+
+### How to Contribute
+
+1. **Fork the repository**
+   ```bash
+   # Click the "Fork" button on GitHub
+   git clone https://github.com/your-username/lexicon-flow.git
+   cd lexicon-flow
+   ```
+
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/your-feature-name
+   # or
+   git checkout -b fix/your-bug-fix
+   ```
+
+3. **Make your changes**
+   - Write clean, documented code
+   - Follow the existing code style
+   - Add tests for new features
+   - Update documentation as needed
+
+4. **Test your changes**
+   ```bash
+   npm run lint          # Check code style
+   npm run test:run      # Run unit tests
+   npm run test:e2e      # Run E2E tests (requires local Supabase)
+   npm run build         # Verify build succeeds
+   ```
+
+5. **Commit your changes**
+   ```bash
+   git add .
+   git commit -m "feat: add amazing feature" # Use conventional commits
+   ```
+
+6. **Push and create a Pull Request**
+   ```bash
+   git push origin feature/your-feature-name
+   # Then open a PR on GitHub
+   ```
+
+### Contribution Guidelines
+
+- **Code Style**: Follow the ESLint configuration
+- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) format
+- **Testing**: Add tests for new features and bug fixes
+- **Documentation**: Update README and inline docs for significant changes
+- **RLS Policies**: When adding new tables, always add Row-Level Security policies
+- **Type Safety**: Ensure all TypeScript code is properly typed
+
+### Development Setup
+
+Make sure you have:
+- Node.js 18+ installed
+- Local Supabase instance running (`supabase start`)
+- Environment variables configured (`.env.local`)
+- Test environment configured (`.env.test`)
+
+### Reporting Issues
+
+Found a bug or have a feature request? Please:
+1. Check existing issues to avoid duplicates
+2. Use the issue templates provided
+3. Include reproduction steps for bugs
+4. Provide context and use cases for feature requests
+
+---
+
+## 🔒 Security
+
+### Security Best Practices
+
+This project follows security best practices for production deployments:
+
+**Authentication & Authorization**
+- Clerk handles user authentication with secure session management
+- Supabase Row-Level Security (RLS) enforces data access at the database level
+- JWT tokens are validated on every request
+- Organization-based access control prevents data leaks between tenants
+
+**Environment Variables**
+- Never commit `.env*` files (they're in `.gitignore`)
+- Use different credentials for development, testing, and production
+- Rotate API keys and secrets regularly
+- Use Vercel environment variables for production secrets
+
+**Database Security**
+- All tables have RLS policies enabled
+- Service role key is only used in secure server contexts
+- Prepared statements prevent SQL injection
+- Cascading deletes maintain referential integrity
+
+**Monitoring & Error Tracking**
+- Sentry monitors errors and performance in production
+- User context is captured (but sensitive data is filtered)
+- Error boundaries prevent full app crashes
+- Session replay helps debug issues (with privacy controls)
+
+### Reporting Security Vulnerabilities
+
+If you discover a security vulnerability, please:
+1. **DO NOT** open a public GitHub issue
+2. Email the maintainers directly (create a security policy file)
+3. Provide detailed steps to reproduce the vulnerability
+4. Allow time for a fix before public disclosure
+
+We take security seriously and will respond promptly to verified reports.
+
+### Security Checklist for Deployments
+
+Before deploying to production:
+- [ ] All environment variables are set correctly
+- [ ] RLS policies are enabled on all tables
+- [ ] Service role key is only used server-side
+- [ ] CORS is properly configured
+- [ ] Rate limiting is enabled on API routes
+- [ ] Webhook signatures are verified (Clerk, Stripe, etc.)
+- [ ] Sentry is configured for error monitoring
+- [ ] Database backups are scheduled
+- [ ] SSL/TLS is enabled for all connections
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### What This Means
+
+You are free to:
+- ✅ Use this project commercially
+- ✅ Modify the source code
+- ✅ Distribute your own versions
+- ✅ Use it privately
+
+Under the conditions:
+- 📋 Include the original license and copyright notice
+- 📋 State changes made to the code
+
+**No warranty is provided** - use at your own risk.
 
 ---
 

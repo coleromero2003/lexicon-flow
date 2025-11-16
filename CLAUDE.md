@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition) project management application built with Next.js 15, Supabase, and Clerk authentication. The app supports real-time collaboration, organizational workflows, and complex object relationship management for industrial control systems.
+Lexicon Flow is a comprehensive SCADA (Supervisory Control and Data Acquisition) project management application built with Next.js 16, Supabase, and Clerk authentication. The app supports real-time collaboration, organizational workflows, and complex object relationship management for industrial control systems.
 
 **Key Technologies:**
-- Next.js 15 with App Router and React 19
+- Next.js 16 with App Router and React 19
 - Supabase for database, authentication, and storage
 - Clerk for advanced authentication and organization management
 - Sentry for error monitoring and performance tracking
