@@ -98,9 +98,6 @@ export interface Task {
   sort_order: number;
 }
 
-// Legacy type alias for backward compatibility (can be removed after all references are updated)
-export type ObjectSubtask = Task;
-
 // ===== PARTS =====
 export interface Part {
   id: number;

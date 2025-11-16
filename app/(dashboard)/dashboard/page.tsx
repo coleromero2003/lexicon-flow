@@ -33,7 +33,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSupabase } from "@/lib/supabase/SupabaseProvider";
-import type { ScadaObject, ObjectSubtask } from "@/lib/supabase/models";
+import type { ScadaObject, Task } from "@/lib/supabase/models";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
@@ -95,7 +95,7 @@ function ProjectsPageContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(() => createDefaultFilters());
   const [assignedObjects, setAssignedObjects] = useState<ObjectWithProject[]>([]);
-  const [assignedTasks, setAssignedTasks] = useState<ObjectSubtask[]>([]);
+  const [assignedTasks, setAssignedTasks] = useState<Task[]>([]);
   const [loadingUserData, setLoadingUserData] = useState(true);
 
   useEffect(() => {
@@ -178,7 +178,7 @@ function ProjectsPageContent() {
       setAssignedObjects(incompleteUserObjects);
 
       // Fetch tasks assigned to objects that belong to the user
-      let objectTasks: ObjectSubtask[] = [];
+      let objectTasks: Task[] = [];
       if (incompleteUserObjects.length > 0) {
         const objectIds = incompleteUserObjects.map((obj: ObjectWithProject) => obj.id);
         const { data: tasks, error: tasksError } = await supabase
@@ -208,7 +208,7 @@ function ProjectsPageContent() {
       }
 
       // Filter standalone tasks where user is in assignee array
-      const userStandaloneTasks = (standaloneTasks || []).filter((task: ObjectSubtask) =>
+      const userStandaloneTasks = (standaloneTasks || []).filter((task: Task) =>
         task.assignee && task.assignee.includes(user.id)
       );
 

@@ -652,14 +652,6 @@ export const taskService = {
   },
 };
 
-// Legacy export for backward compatibility (can be removed after all references are updated)
-export const objectSubtaskService = {
-  getSubtasksByObject: taskService.getTasksByObject,
-  getSubtasks: taskService.getTasksByObject,
-  createSubtask: taskService.createTask,
-  updateSubtask: taskService.updateTask,
-};
-
 // =======================
 // FILE SERVICES
 // =======================

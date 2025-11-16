@@ -53,7 +53,7 @@ vi.mock("@dnd-kit/sortable", () => {
 });
 
 import { SubtasksCard } from "../subtasks-card";
-import { ObjectSubtask } from "@/lib/supabase/models";
+import { Task } from "@/lib/supabase/models";
 
 const triggerDragEnd = (event: { active: { id: number }; over: { id: number } | null }) => {
   latestDragEnd?.(event);
@@ -132,7 +132,7 @@ describe("SubtasksCard", () => {
     const user = userEvent.setup();
     const handlers = createHandlers();
 
-    const subtasks: ObjectSubtask[] = [
+    const subtasks: Task[] = [
       { id: 1, object_id: 100, title: "First subtask", is_done: false, sort_order: 0 },
       { id: 2, object_id: 100, title: "Second subtask", is_done: true, sort_order: 1 },
       { id: 3, object_id: 100, title: "Third subtask", is_done: false, sort_order: 2 },
