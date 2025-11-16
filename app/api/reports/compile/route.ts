@@ -7,6 +7,7 @@ import {
   objectFileService,
   objectLexiconService,
   lexiconFileService,
+  lexiconService,
 } from "@/lib/services";
 
 interface PDFSource {
@@ -15,6 +16,11 @@ interface PDFSource {
   source: "object" | "lexicon";
   lexiconName?: string;
 }
+
+// PDF Layout Constants
+const FIRST_CONTENT_PAGE = 3; // Page number where content starts (after title and TOC)
+const MAX_DESCRIPTION_LINES = 30; // Maximum lines to display on title page
+const PAGE_BOTTOM_MARGIN = 50; // Minimum y-position before page overflow
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,12 +83,20 @@ export async function POST(req: NextRequest) {
     const lexiconPdfs: PDFSource[] = [];
 
     for (const link of lexiconLinks) {
-      // Fetch lexicon item to get name
-      const { data: lexiconItem } = await supabase
-        .from("lexicon_items")
-        .select("name")
-        .eq("id", link.lexicon_id)
-        .single();
+      // Fetch lexicon item to get name using service layer
+      let lexiconItem;
+      try {
+        lexiconItem = await lexiconService.getLexiconItem(
+          supabase,
+          link.lexicon_id
+        );
+      } catch (error) {
+        console.error(
+          `Failed to fetch lexicon item ${link.lexicon_id}:`,
+          error
+        );
+        continue; // Skip this lexicon item if we can't fetch it
+      }
 
       // Fetch files for this lexicon item
       const lexiconFiles = await lexiconFileService.getFilesForLexicon(
@@ -96,7 +110,7 @@ export async function POST(req: NextRequest) {
           filename: file.filename,
           storageKey: file.storage_key,
           source: "lexicon" as const,
-          lexiconName: lexiconItem?.name || `Lexicon Item ${link.lexicon_id}`,
+          lexiconName: lexiconItem.name,
         }));
 
       lexiconPdfs.push(...pdfs);
@@ -121,8 +135,11 @@ export async function POST(req: NextRequest) {
     await addTitlePage(mergedPdf, object.title, object.description_md || "");
 
     // Add table of contents page
-    let currentPageNumber = 3; // Title page is page 1, TOC is page 2
+    let currentPageNumber = FIRST_CONTENT_PAGE;
     const tocEntries: { title: string; page: number; source: string }[] = [];
+
+    // Cache PDFs to avoid downloading twice (once for TOC, once for merging)
+    const pdfCache = new Map<string, ArrayBuffer>();
 
     for (const pdf of allPdfs) {
       // Download the PDF from storage to get page count
@@ -133,6 +150,8 @@ export async function POST(req: NextRequest) {
       if (!fileData) continue;
 
       const pdfBytes = await fileData.arrayBuffer();
+      pdfCache.set(pdf.storageKey, pdfBytes); // Cache for later use
+
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pageCount = pdfDoc.getPageCount();
 
@@ -164,18 +183,16 @@ export async function POST(req: NextRequest) {
     // Download and merge all PDFs
     let currentPageIndex = 2; // Start after title and TOC pages
     for (const pdf of allPdfs) {
-      const { data: fileData, error } = await supabase.storage
-        .from("lexicon-files")
-        .download(pdf.storageKey);
+      // Use cached PDF bytes instead of downloading again
+      const cachedBytes = pdfCache.get(pdf.storageKey);
 
-      if (error || !fileData) {
-        console.error(`Failed to download file: ${pdf.filename}`, error);
+      if (!cachedBytes) {
+        console.error(`PDF not found in cache: ${pdf.filename}`);
         continue;
       }
 
       try {
-        const pdfBytes = await fileData.arrayBuffer();
-        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pdfDoc = await PDFDocument.load(cachedBytes);
         const pageCount = pdfDoc.getPageCount();
         const pages = await mergedPdf.copyPages(
           pdfDoc,
@@ -241,11 +258,14 @@ async function addTitlePage(
   title: string,
   descriptionMd: string
 ) {
+  // Type assertion needed: PDFPage type definition doesn't include all methods available at runtime
+  // This is safe because addPage() returns a valid PDFPage object with drawing methods
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
-  // Embed standard Helvetica fonts (built-in)
+  // Type assertion needed: embedFont() exists at runtime but is not in pdf-lib's TypeScript definitions
+  // Safe because Helvetica fonts are built into PDF standard and always available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const font = await (pdfDoc as any).embedFont('Helvetica');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,8 +299,7 @@ async function addTitlePage(
   );
 
   let yPosition = height - 190;
-  for (const line of descriptionLines.slice(0, 30)) {
-    // Limit to 30 lines
+  for (const line of descriptionLines.slice(0, MAX_DESCRIPTION_LINES)) {
     page.drawText(line, {
       x: 50,
       y: yPosition,
@@ -289,7 +308,7 @@ async function addTitlePage(
     });
     yPosition -= 18;
 
-    if (yPosition < 50) break; // Don't overflow the page
+    if (yPosition < PAGE_BOTTOM_MARGIN) break; // Don't overflow the page
   }
 
   // Add footer
@@ -308,10 +327,14 @@ async function addTableOfContents(
   pdfDoc: PDFDocument,
   entries: { title: string; page: number; source: string }[]
 ) {
+  // Type assertion needed: PDFPage type definition doesn't include all methods available at runtime
+  // This is safe because addPage() returns a valid PDFPage object with drawing methods
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
+  // Type assertion needed: embedFont() exists at runtime but is not in pdf-lib's TypeScript definitions
+  // Safe because Helvetica fonts are built into PDF standard and always available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const font = await (pdfDoc as any).embedFont('Helvetica');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -333,7 +356,7 @@ async function addTableOfContents(
   const lineHeight = 20;
 
   for (const entry of entries) {
-    if (yPosition < 50) break; // Don't overflow the page
+    if (yPosition < PAGE_BOTTOM_MARGIN) break; // Don't overflow the page
 
     // Draw filename
     const truncatedTitle =
@@ -409,7 +432,9 @@ async function addBookmarks(
   pdfDoc: PDFDocument,
   bookmarks: { title: string; pageIndex: number }[]
 ) {
-  // Get the PDF context (low-level API)
+  // Type assertions needed: Accessing pdf-lib's low-level API for bookmark/outline creation
+  // The context and catalog properties exist at runtime but are not exposed in TypeScript types
+  // This is safe because we're using documented pdf-lib internal APIs for advanced features
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const context = (pdfDoc as any).context;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -425,13 +450,16 @@ async function addBookmarks(
   // Pre-allocate all outline item refs
   const outlineItemRefs = bookmarks.map(() => context.nextRef());
 
-  // Get all pages from the PDF
+  // Type assertion needed: getPages() is not in public TypeScript API but exists at runtime
+  // Safe because we're working with the internal page array for bookmark destination references
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pages = (pdfDoc as any).getPages();
 
   // Create outline items
   const outlineItemDicts = bookmarks.map((bookmark, i) => {
     const page = pages[bookmark.pageIndex];
+    // Type assertion needed: Access internal page reference for PDF destination linking
+    // Safe because every PDFPage object has a ref property for internal PDF object references
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pageRef = (page as any).ref;
 

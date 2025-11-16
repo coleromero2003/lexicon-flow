@@ -805,14 +805,10 @@ const updatedMetadata = {
   };
 
   const handlePdfTypeSelection = useCallback(
-    (type: "purchase-report" | "merge-pdfs" | "compile-pdfs" | "submittal-pdf") => {
+    (type: "merge-pdfs" | "compile-pdfs") => {
       if (!object) return;
 
       switch (type) {
-        case "purchase-report":
-          // TODO: Implement purchase report generation
-          toast.info("Purchase report feature coming soon");
-          break;
         case "merge-pdfs": {
           const pdfFileIds = objectFiles
             .filter((f) => f.mime_type === "application/pdf")
@@ -822,10 +818,6 @@ const updatedMetadata = {
         }
         case "compile-pdfs":
           compileAndDownloadPdfs(parsedObjectId, object.title);
-          break;
-        case "submittal-pdf":
-          // TODO: Implement submittal PDF functionality
-          toast.info("Submittal PDF feature coming soon");
           break;
       }
     },
