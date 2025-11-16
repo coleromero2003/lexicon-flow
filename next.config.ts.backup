@@ -11,10 +11,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Enable Cache Components mode (Next.js 16.0.3 - stable flag)
-  // This enables explicit caching with "use cache" directive
-  // All routes are dynamic by default - opt-in to caching
-  cacheComponents: true,
 };
 
 export default withSentryConfig(nextConfig, {

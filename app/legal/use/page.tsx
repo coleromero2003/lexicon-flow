@@ -3,8 +3,11 @@ import { renderLegalMarkdown } from "@/lib/renderMarkdown";
 import Image from "next/image";
 import Link from "next/link";
 
-export const dynamic = "error"; // fully static build
-export const revalidate = false;
+// MIGRATED: Removed incompatible Route Segment Config exports
+// - Removed: export const dynamic = "error"
+// - Removed: export const revalidate = false
+// Migration: Added "use cache" directive to preserve static behavior
+// Legal content rarely changes, so caching is appropriate
 
 export const metadata = {
   title: "Terms of Service",
@@ -12,6 +15,7 @@ export const metadata = {
 };
 
 export default async function Page() {
+  "use cache";
   const html = await renderLegalMarkdown("Acceptable_Use_Policy.md");
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">

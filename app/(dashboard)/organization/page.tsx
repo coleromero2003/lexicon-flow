@@ -1,118 +1,23 @@
-"use client";
-
-import {
-  OrganizationProfile,
-  CreateOrganization,
-  useOrganization,
-  useUser,
-} from "@clerk/nextjs";
-import { ShieldAlert } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import OrganizationClientPage from "./organization-client";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 
-export default function OrganizationPage() {
-  const router = useRouter();
-  const { isSignedIn, isLoaded: userLoaded } = useUser();
-  const {
-    organization,
-    membership,
-    isLoaded: organizationLoaded,
-  } = useOrganization();
-
-  // Redirect to sign-in if not authenticated
-  useEffect(() => {
-    if (userLoaded && !isSignedIn) {
-      router.push("/sign-in");
-    }
-  }, [isSignedIn, userLoaded, router]);
-
-  // Show loading while checking authentication
-  const shouldShowLoading = !userLoaded || (isSignedIn && !organizationLoaded);
-
-  if (shouldShowLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <LoadingSpinner label="Loading your account..." />
-      </div>
-    );
-  }
-
-  // Don't render anything if not signed in (will redirect)
-  if (!isSignedIn) {
-    return null;
-  }
-
-  const isAdmin = membership?.role === "org:admin";
-
-  if (organization && !isAdmin) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-
-        <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="max-w-xl mx-auto text-center">
-            <div className="bg-white shadow-lg rounded-lg p-8">
-              <ShieldAlert className="h-12 w-12 text-destructive mx-auto mb-4" />
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-                Administrator Access Required
-              </h1>
-              <p className="text-gray-600 mb-6">
-                Only organization administrators can manage organization settings.
-                Please contact an administrator to request access.
-              </p>
-              <Link href="/projects">
-                <Button>Go to Projects</Button>
-              </Link>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+// Server Component wrapper for Client Component page
+// Ensures dynamic rendering for organization page
+export default async function OrganizationPage() {
+  // Opt into dynamic rendering
+  await connection();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="mb-6">
-
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            {organization ? "Organization Settings" : "Create Your Organization"}
-          </h1>
-          <p className="text-gray-600">
-            {organization
-              ? `Manage ${organization.name} settings, members, and invitations`
-              : "Create your organization to start managing SCADA projects"}
-          </p>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen">
+          <LoadingSpinner />
         </div>
-
-        <div className="flex justify-center">
-          {organization ? (
-            <OrganizationProfile
-              routing="hash"
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  card: "shadow-lg",
-                },
-              }}
-            />
-          ) : (
-            <CreateOrganization
-              routing="hash"
-              appearance={{
-                elements: {
-                  rootBox: "w-full",
-                  card: "shadow-lg",
-                },
-              }}
-              afterCreateOrganizationUrl="/projects"
-            />
-          )}
-        </div>
-      </main>
-    </div>
+      }
+    >
+      <OrganizationClientPage />
+    </Suspense>
   );
 }
