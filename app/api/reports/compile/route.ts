@@ -152,7 +152,17 @@ export async function POST(req: NextRequest) {
 
     await addTableOfContents(mergedPdf, tocEntries);
 
+    // Track page indices for bookmarks
+    const bookmarkData: { title: string; pageIndex: number }[] = [];
+
+    // Add bookmark for title page
+    bookmarkData.push({ title: "Title Page", pageIndex: 0 });
+
+    // Add bookmark for table of contents
+    bookmarkData.push({ title: "Table of Contents", pageIndex: 1 });
+
     // Download and merge all PDFs
+    let currentPageIndex = 2; // Start after title and TOC pages
     for (const pdf of allPdfs) {
       const { data: fileData, error } = await supabase.storage
         .from("lexicon-files")
@@ -172,14 +182,29 @@ export async function POST(req: NextRequest) {
           Array.from({ length: pageCount }, (_, j) => j)
         );
 
+        // Add bookmark for this PDF
+        const sourceLabel =
+          pdf.source === "object"
+            ? `${pdf.filename}`
+            : `${pdf.lexiconName} - ${pdf.filename}`;
+        bookmarkData.push({
+          title: sourceLabel,
+          pageIndex: currentPageIndex,
+        });
+
         pages.forEach((page) => {
           mergedPdf.addPage(page);
         });
+
+        currentPageIndex += pageCount;
       } catch (error) {
         console.error(`Error merging PDF ${pdf.filename}:`, error);
         // Continue with other PDFs instead of failing completely
       }
     }
+
+    // Add bookmarks/outlines to the PDF
+    await addBookmarks(mergedPdf, bookmarkData);
 
     // Save merged PDF
     const mergedPdfBytes = await mergedPdf.save();
@@ -375,6 +400,70 @@ function wrapText(
   }
 
   return lines;
+}
+
+/**
+ * Add PDF bookmarks/outlines for navigation
+ */
+async function addBookmarks(
+  pdfDoc: PDFDocument,
+  bookmarks: { title: string; pageIndex: number }[]
+) {
+  // Get the PDF context (low-level API)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const context = (pdfDoc as any).context;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const catalog = (pdfDoc as any).catalog;
+
+  // Create outline dictionary
+  const outlineRef = context.nextRef();
+  const outlineDict = context.obj({
+    Type: "Outlines",
+    Count: bookmarks.length,
+  });
+
+  // Pre-allocate all outline item refs
+  const outlineItemRefs = bookmarks.map(() => context.nextRef());
+
+  // Get all pages from the PDF
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pages = (pdfDoc as any).getPages();
+
+  // Create outline items
+  const outlineItemDicts = bookmarks.map((bookmark, i) => {
+    const page = pages[bookmark.pageIndex];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pageRef = (page as any).ref;
+
+    return context.obj({
+      Title: context.obj(bookmark.title),
+      Parent: outlineRef,
+      Prev: i > 0 ? outlineItemRefs[i - 1] : undefined,
+      Next: i < bookmarks.length - 1 ? outlineItemRefs[i + 1] : undefined,
+      Dest: [pageRef, "XYZ", null, null, null],
+    });
+  });
+
+  // Update outline dictionary with first and last items
+  if (outlineItemRefs.length > 0) {
+    outlineDict.set(
+      context.obj("First"),
+      outlineItemRefs[0]
+    );
+    outlineDict.set(
+      context.obj("Last"),
+      outlineItemRefs[outlineItemRefs.length - 1]
+    );
+  }
+
+  // Register outline and items in context
+  context.assign(outlineRef, outlineDict);
+  outlineItemRefs.forEach((ref, i) => {
+    context.assign(ref, outlineItemDicts[i]);
+  });
+
+  // Add outline to catalog
+  catalog.set(context.obj("Outlines"), outlineRef);
 }
 
 // Add OPTIONS handler for CORS if needed

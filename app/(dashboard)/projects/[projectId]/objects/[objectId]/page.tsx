@@ -10,7 +10,6 @@ import { notifyTaskCreated, notifyTaskUpdated, getNotificationContext } from "@/
 
 import { PdfViewerDialog } from "@/components/file-viewer/pdf-viewer-dialog";
 import { ExcelViewerDialog } from "@/components/file-viewer/excel-viewer-dialog";
-import { SubmittalPDFDialog } from "@/components/objects/submittal-pdf-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -150,8 +149,6 @@ export default function ObjectPage() {
   const [isLoadingLexiconItems, setIsLoadingLexiconItems] = useState(false);
   const [isLinkingLexicon, setIsLinkingLexicon] = useState(false);
 
-  const [isSubmittalPdfDialogOpen, setIsSubmittalPdfDialogOpen] =
-    useState(false);
   // PDF selection dialog state - Hidden until feature is complete
   // const [isPdfSelectionDialogOpen, setIsPdfSelectionDialogOpen] =
   //   useState(false);
@@ -1069,12 +1066,6 @@ const updatedMetadata = {
           loading={viewerLoading}
         />
       )}
-
-      <SubmittalPDFDialog
-        open={isSubmittalPdfDialogOpen}
-        onOpenChange={setIsSubmittalPdfDialogOpen}
-        submittalObject={object}
-      />
 
       {/* PDF Selection Dialog - Hidden until feature is complete */}
       {/* <PdfSelectionDialog

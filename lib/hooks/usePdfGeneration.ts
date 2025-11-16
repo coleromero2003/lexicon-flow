@@ -4,45 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export function usePdfGeneration() {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
-
-  /**
-   * Generate a purchase report PDF for a SCADA object
-   */
-  async function generatePurchaseReport(objectId: number): Promise<Blob | null> {
-    setIsGenerating(true);
-
-    try {
-      const response = await fetch("/api/reports/purchase", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ objectId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to generate report");
-      }
-
-      const blob = await response.blob();
-      toast.success("Purchase report generated successfully!");
-      return blob;
-    } catch (error) {
-      console.error("Error generating purchase report:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to generate purchase report"
-      );
-      return null;
-    } finally {
-      setIsGenerating(false);
-    }
-  }
 
   /**
    * Download a PDF blob to the user's device
@@ -56,17 +19,6 @@ export function usePdfGeneration() {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }
-
-  /**
-   * Generate and download a purchase report
-   */
-  async function generateAndDownloadReport(objectId: number, objectTitle: string) {
-    const blob = await generatePurchaseReport(objectId);
-    if (blob) {
-      const filename = `purchase-report-${objectTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
-      downloadPdf(blob, filename);
-    }
   }
 
   /**
@@ -165,11 +117,8 @@ export function usePdfGeneration() {
   }
 
   return {
-    isGenerating,
     isMerging,
     isCompiling,
-    generatePurchaseReport,
-    generateAndDownloadReport,
     mergePdfs,
     mergeAndDownloadPdfs,
     compilePdfs,

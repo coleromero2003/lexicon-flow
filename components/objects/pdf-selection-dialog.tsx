@@ -8,9 +8,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FileDown, FilePlus2, FileText, FileCheck } from "lucide-react";
+import { FilePlus2, FileText } from "lucide-react";
 
-type PdfType = "purchase-report" | "merge-pdfs" | "compile-pdfs" | "submittal-pdf";
+type PdfType = "merge-pdfs" | "compile-pdfs";
 
 interface PdfSelectionDialogProps {
   open: boolean;
@@ -32,29 +32,17 @@ export function PdfSelectionDialog({
 
   const options = [
     {
-      type: "purchase-report" as PdfType,
-      icon: FileDown,
-      label: "Purchase Report",
-      description: "Generate a detailed purchase report for this object",
-    },
-    {
       type: "merge-pdfs" as PdfType,
       icon: FilePlus2,
       label: `Merge ${pdfCount} PDFs`,
-      description: "Combine all PDF files into a single document",
+      description: "Combine all PDF files into a single document (no title page)",
       disabled: pdfCount < 2,
     },
     {
       type: "compile-pdfs" as PdfType,
       icon: FileText,
       label: "Compile All PDFs",
-      description: "Compile all PDFs associated with this object",
-    },
-    {
-      type: "submittal-pdf" as PdfType,
-      icon: FileCheck,
-      label: "Submittal PDF",
-      description: "Generate a submittal package PDF",
+      description: "Compile all PDFs with title page, table of contents, and bookmarks",
     },
   ];
 
