@@ -19,7 +19,6 @@ interface PDFSource {
 
 // PDF Layout Constants
 const FIRST_CONTENT_PAGE = 3; // Page number where content starts (after title and TOC)
-const MAX_DESCRIPTION_LINES = 30; // Maximum lines to display on title page
 const PAGE_BOTTOM_MARGIN = 50; // Minimum y-position before page overflow
 
 export async function POST(req: NextRequest) {
@@ -81,6 +80,7 @@ export async function POST(req: NextRequest) {
     );
 
     const lexiconPdfs: PDFSource[] = [];
+    const warnings: string[] = [];
 
     for (const link of lexiconLinks) {
       // Fetch lexicon item to get name using service layer
@@ -90,30 +90,75 @@ export async function POST(req: NextRequest) {
           supabase,
           link.lexicon_id
         );
+
+        // SECURITY: Explicit authorization check to ensure lexicon item belongs to same org
+        // This provides defense-in-depth even if RLS policies are misconfigured
+        if (!lexiconItem) {
+          console.warn(
+            `Lexicon item ${link.lexicon_id} not found or unauthorized`
+          );
+          warnings.push(
+            `Lexicon item ID ${link.lexicon_id} could not be accessed (not found or unauthorized)`
+          );
+          continue;
+        }
+
+        // Verify org_id matches the authenticated organization
+        if (orgId && lexiconItem.org_id !== orgId) {
+          console.error(
+            `Authorization failed: Lexicon item ${link.lexicon_id} belongs to org ${lexiconItem.org_id}, but user is in org ${orgId}`
+          );
+          return NextResponse.json(
+            {
+              error: "Unauthorized access to lexicon item",
+              details: `Lexicon item ${link.lexicon_id} does not belong to your organization`,
+            },
+            { status: 403 }
+          );
+        }
       } catch (error) {
         console.error(
           `Failed to fetch lexicon item ${link.lexicon_id}:`,
           error
         );
+        warnings.push(
+          `Failed to load lexicon item ID ${link.lexicon_id}: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
         continue; // Skip this lexicon item if we can't fetch it
       }
 
       // Fetch files for this lexicon item
-      const lexiconFiles = await lexiconFileService.getFilesForLexicon(
-        supabase,
-        link.lexicon_id
-      );
+      try {
+        const lexiconFiles = await lexiconFileService.getFilesForLexicon(
+          supabase,
+          link.lexicon_id
+        );
 
-      const pdfs = lexiconFiles
-        .filter((file) => file.mime_type === "application/pdf")
-        .map((file) => ({
-          filename: file.filename,
-          storageKey: file.storage_key,
-          source: "lexicon" as const,
-          lexiconName: lexiconItem.name,
-        }));
+        const pdfs = lexiconFiles
+          .filter((file) => file.mime_type === "application/pdf")
+          .map((file) => ({
+            filename: file.filename,
+            storageKey: file.storage_key,
+            source: "lexicon" as const,
+            lexiconName: lexiconItem.name,
+          }));
 
-      lexiconPdfs.push(...pdfs);
+        if (pdfs.length === 0) {
+          warnings.push(
+            `Lexicon item "${lexiconItem.name}" has no PDF files attached`
+          );
+        }
+
+        lexiconPdfs.push(...pdfs);
+      } catch (error) {
+        console.error(
+          `Failed to fetch files for lexicon item ${link.lexicon_id}:`,
+          error
+        );
+        warnings.push(
+          `Failed to load files for lexicon item "${lexiconItem.name}": ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
     }
 
     const allPdfs = [...objectPdfs, ...lexiconPdfs];
@@ -131,8 +176,13 @@ export async function POST(req: NextRequest) {
     // Create the merged PDF document
     const mergedPdf = await PDFDocument.create();
 
-    // Add title page with object description (markdown)
-    await addTitlePage(mergedPdf, object.title, object.description_md || "");
+    // Add title page with object description (markdown) and any warnings
+    await addTitlePage(
+      mergedPdf,
+      object.title,
+      object.description_md || "",
+      warnings
+    );
 
     // Add table of contents page
     let currentPageNumber = FIRST_CONTENT_PAGE;
@@ -187,7 +237,9 @@ export async function POST(req: NextRequest) {
       const cachedBytes = pdfCache.get(pdf.storageKey);
 
       if (!cachedBytes) {
-        console.error(`PDF not found in cache: ${pdf.filename}`);
+        const errorMsg = `PDF file "${pdf.filename}" not found in cache`;
+        console.error(errorMsg);
+        warnings.push(errorMsg);
         continue;
       }
 
@@ -215,7 +267,9 @@ export async function POST(req: NextRequest) {
 
         currentPageIndex += pageCount;
       } catch (error) {
-        console.error(`Error merging PDF ${pdf.filename}:`, error);
+        const errorMsg = `Failed to merge PDF "${pdf.filename}": ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error(errorMsg, error);
+        warnings.push(errorMsg);
         // Continue with other PDFs instead of failing completely
       }
     }
@@ -251,12 +305,13 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Add a title page with the object title and description markdown
+ * Add a title page with the object title, description markdown, and compilation warnings
  */
 async function addTitlePage(
   pdfDoc: PDFDocument,
   title: string,
-  descriptionMd: string
+  descriptionMd: string,
+  warnings: string[] = []
 ) {
   // Type assertion needed: PDFPage type definition doesn't include all methods available at runtime
   // This is safe because addPage() returns a valid PDFPage object with drawing methods
@@ -281,13 +336,59 @@ async function addTitlePage(
     font: boldFont,
   });
 
+  let yPosition = height - 160;
+
+  // Draw warnings if any
+  if (warnings.length > 0) {
+    page.drawText("⚠ Compilation Warnings", {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+    });
+    yPosition -= 20;
+
+    // Display up to 5 warnings on title page
+    const displayWarnings = warnings.slice(0, 5);
+    for (const warning of displayWarnings) {
+      const warningLines = wrapText(warning, font, 10, width - 100);
+      for (const line of warningLines) {
+        page.drawText(`• ${line}`, {
+          x: 50,
+          y: yPosition,
+          size: 10,
+          font: font,
+        });
+        yPosition -= 14;
+
+        if (yPosition < PAGE_BOTTOM_MARGIN + 200) break; // Reserve space for description
+      }
+    }
+
+    if (warnings.length > 5) {
+      page.drawText(
+        `... and ${warnings.length - 5} more warning(s). See logs for details.`,
+        {
+          x: 50,
+          y: yPosition,
+          size: 10,
+          font: font,
+        }
+      );
+      yPosition -= 14;
+    }
+
+    yPosition -= 20; // Extra spacing before description
+  }
+
   // Draw description label
   page.drawText("Description", {
     x: 50,
-    y: height - 160,
+    y: yPosition,
     size: 14,
     font: boldFont,
   });
+  yPosition -= 30;
 
   // Draw description (simplified - just raw text without markdown formatting)
   // For a production system, you'd want to parse markdown and render it properly
@@ -298,8 +399,12 @@ async function addTitlePage(
     width - 100
   );
 
-  let yPosition = height - 190;
-  for (const line of descriptionLines.slice(0, MAX_DESCRIPTION_LINES)) {
+  const maxDescriptionLines = Math.max(
+    5,
+    Math.floor((yPosition - PAGE_BOTTOM_MARGIN - 50) / 18)
+  ); // Dynamic line limit based on available space
+
+  for (const line of descriptionLines.slice(0, maxDescriptionLines)) {
     page.drawText(line, {
       x: 50,
       y: yPosition,
@@ -308,7 +413,7 @@ async function addTitlePage(
     });
     yPosition -= 18;
 
-    if (yPosition < PAGE_BOTTOM_MARGIN) break; // Don't overflow the page
+    if (yPosition < PAGE_BOTTOM_MARGIN + 50) break; // Don't overflow the page
   }
 
   // Add footer
