@@ -112,7 +112,7 @@ All database interactions go through service functions in `lib/services.ts`:
 - `stepService` - Operations for steps
 - `objectService` - Operations for SCADA objects
 - `objectRelationService` - Manage object relationships
-- `objectSubtaskService` - Manage object subtasks
+- `taskService` - Task management (including object subtasks)
 - `fileService` - File metadata management
 - `objectFileService` - Link files to objects
 - `objectLexiconService` - Link lexicon items to objects

@@ -23,16 +23,6 @@ export function sanitizeProjectCode(value: string): string {
   return sanitizePlainText(value);
 }
 
-/**
- * Validates project code format
- * @param code - The code to validate
- * @returns True if code matches pattern, false otherwise
- */
-export function isValidProjectCode(code: string): boolean {
-  const CODE_PATTERN = /^[A-Za-z0-9_-]{0,20}$/;
-  return CODE_PATTERN.test(code);
-}
-
 // Common validation constants
 export const MAX_NAME_LENGTH = 100;
 export const MAX_DESCRIPTION_LENGTH = 500;

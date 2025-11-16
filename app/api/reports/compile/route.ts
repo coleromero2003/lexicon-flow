@@ -7,6 +7,7 @@ import {
   objectFileService,
   objectLexiconService,
   lexiconFileService,
+  lexiconService,
 } from "@/lib/services";
 
 interface PDFSource {
@@ -15,6 +16,10 @@ interface PDFSource {
   source: "object" | "lexicon";
   lexiconName?: string;
 }
+
+// PDF Layout Constants
+const FIRST_CONTENT_PAGE = 3; // Page number where content starts (after title and TOC)
+const PAGE_BOTTOM_MARGIN = 50; // Minimum y-position before page overflow
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,31 +80,85 @@ export async function POST(req: NextRequest) {
     );
 
     const lexiconPdfs: PDFSource[] = [];
+    const warnings: string[] = [];
 
     for (const link of lexiconLinks) {
-      // Fetch lexicon item to get name
-      const { data: lexiconItem } = await supabase
-        .from("lexicon_items")
-        .select("name")
-        .eq("id", link.lexicon_id)
-        .single();
+      // Fetch lexicon item to get name using service layer
+      let lexiconItem;
+      try {
+        lexiconItem = await lexiconService.getLexiconItem(
+          supabase,
+          link.lexicon_id
+        );
+
+        // SECURITY: Explicit authorization check to ensure lexicon item belongs to same org
+        // This provides defense-in-depth even if RLS policies are misconfigured
+        if (!lexiconItem) {
+          console.warn(
+            `Lexicon item ${link.lexicon_id} not found or unauthorized`
+          );
+          warnings.push(
+            `Lexicon item ID ${link.lexicon_id} could not be accessed (not found or unauthorized)`
+          );
+          continue;
+        }
+
+        // Verify org_id matches the authenticated organization
+        if (orgId && lexiconItem.org_id !== orgId) {
+          console.error(
+            `Authorization failed: Lexicon item ${link.lexicon_id} belongs to org ${lexiconItem.org_id}, but user is in org ${orgId}`
+          );
+          return NextResponse.json(
+            {
+              error: "Unauthorized access to lexicon item",
+              details: `Lexicon item ${link.lexicon_id} does not belong to your organization`,
+            },
+            { status: 403 }
+          );
+        }
+      } catch (error) {
+        console.error(
+          `Failed to fetch lexicon item ${link.lexicon_id}:`,
+          error
+        );
+        warnings.push(
+          `Failed to load lexicon item ID ${link.lexicon_id}: ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+        continue; // Skip this lexicon item if we can't fetch it
+      }
 
       // Fetch files for this lexicon item
-      const lexiconFiles = await lexiconFileService.getFilesForLexicon(
-        supabase,
-        link.lexicon_id
-      );
+      try {
+        const lexiconFiles = await lexiconFileService.getFilesForLexicon(
+          supabase,
+          link.lexicon_id
+        );
 
-      const pdfs = lexiconFiles
-        .filter((file) => file.mime_type === "application/pdf")
-        .map((file) => ({
-          filename: file.filename,
-          storageKey: file.storage_key,
-          source: "lexicon" as const,
-          lexiconName: lexiconItem?.name || `Lexicon Item ${link.lexicon_id}`,
-        }));
+        const pdfs = lexiconFiles
+          .filter((file) => file.mime_type === "application/pdf")
+          .map((file) => ({
+            filename: file.filename,
+            storageKey: file.storage_key,
+            source: "lexicon" as const,
+            lexiconName: lexiconItem.name,
+          }));
 
-      lexiconPdfs.push(...pdfs);
+        if (pdfs.length === 0) {
+          warnings.push(
+            `Lexicon item "${lexiconItem.name}" has no PDF files attached`
+          );
+        }
+
+        lexiconPdfs.push(...pdfs);
+      } catch (error) {
+        console.error(
+          `Failed to fetch files for lexicon item ${link.lexicon_id}:`,
+          error
+        );
+        warnings.push(
+          `Failed to load files for lexicon item "${lexiconItem.name}": ${error instanceof Error ? error.message : "Unknown error"}`
+        );
+      }
     }
 
     const allPdfs = [...objectPdfs, ...lexiconPdfs];
@@ -117,12 +176,20 @@ export async function POST(req: NextRequest) {
     // Create the merged PDF document
     const mergedPdf = await PDFDocument.create();
 
-    // Add title page with object description (markdown)
-    await addTitlePage(mergedPdf, object.title, object.description_md || "");
+    // Add title page with object description (markdown) and any warnings
+    await addTitlePage(
+      mergedPdf,
+      object.title,
+      object.description_md || "",
+      warnings
+    );
 
     // Add table of contents page
-    let currentPageNumber = 3; // Title page is page 1, TOC is page 2
+    let currentPageNumber = FIRST_CONTENT_PAGE;
     const tocEntries: { title: string; page: number; source: string }[] = [];
+
+    // Cache PDFs to avoid downloading twice (once for TOC, once for merging)
+    const pdfCache = new Map<string, ArrayBuffer>();
 
     for (const pdf of allPdfs) {
       // Download the PDF from storage to get page count
@@ -133,6 +200,8 @@ export async function POST(req: NextRequest) {
       if (!fileData) continue;
 
       const pdfBytes = await fileData.arrayBuffer();
+      pdfCache.set(pdf.storageKey, pdfBytes); // Cache for later use
+
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pageCount = pdfDoc.getPageCount();
 
@@ -152,34 +221,61 @@ export async function POST(req: NextRequest) {
 
     await addTableOfContents(mergedPdf, tocEntries);
 
-    // Download and merge all PDFs
-    for (const pdf of allPdfs) {
-      const { data: fileData, error } = await supabase.storage
-        .from("lexicon-files")
-        .download(pdf.storageKey);
+    // Track page indices for bookmarks
+    const bookmarkData: { title: string; pageIndex: number }[] = [];
 
-      if (error || !fileData) {
-        console.error(`Failed to download file: ${pdf.filename}`, error);
+    // Add bookmark for title page
+    bookmarkData.push({ title: "Title Page", pageIndex: 0 });
+
+    // Add bookmark for table of contents
+    bookmarkData.push({ title: "Table of Contents", pageIndex: 1 });
+
+    // Download and merge all PDFs
+    let currentPageIndex = 2; // Start after title and TOC pages
+    for (const pdf of allPdfs) {
+      // Use cached PDF bytes instead of downloading again
+      const cachedBytes = pdfCache.get(pdf.storageKey);
+
+      if (!cachedBytes) {
+        const errorMsg = `PDF file "${pdf.filename}" not found in cache`;
+        console.error(errorMsg);
+        warnings.push(errorMsg);
         continue;
       }
 
       try {
-        const pdfBytes = await fileData.arrayBuffer();
-        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pdfDoc = await PDFDocument.load(cachedBytes);
         const pageCount = pdfDoc.getPageCount();
         const pages = await mergedPdf.copyPages(
           pdfDoc,
           Array.from({ length: pageCount }, (_, j) => j)
         );
 
+        // Add bookmark for this PDF
+        const sourceLabel =
+          pdf.source === "object"
+            ? `${pdf.filename}`
+            : `${pdf.lexiconName} - ${pdf.filename}`;
+        bookmarkData.push({
+          title: sourceLabel,
+          pageIndex: currentPageIndex,
+        });
+
         pages.forEach((page) => {
           mergedPdf.addPage(page);
         });
+
+        currentPageIndex += pageCount;
       } catch (error) {
-        console.error(`Error merging PDF ${pdf.filename}:`, error);
+        const errorMsg = `Failed to merge PDF "${pdf.filename}": ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error(errorMsg, error);
+        warnings.push(errorMsg);
         // Continue with other PDFs instead of failing completely
       }
     }
+
+    // Add bookmarks/outlines to the PDF
+    await addBookmarks(mergedPdf, bookmarkData);
 
     // Save merged PDF
     const mergedPdfBytes = await mergedPdf.save();
@@ -209,18 +305,22 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Add a title page with the object title and description markdown
+ * Add a title page with the object title, description markdown, and compilation warnings
  */
 async function addTitlePage(
   pdfDoc: PDFDocument,
   title: string,
-  descriptionMd: string
+  descriptionMd: string,
+  warnings: string[] = []
 ) {
+  // Type assertion needed: PDFPage type definition doesn't include all methods available at runtime
+  // This is safe because addPage() returns a valid PDFPage object with drawing methods
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
-  // Embed standard Helvetica fonts (built-in)
+  // Type assertion needed: embedFont() exists at runtime but is not in pdf-lib's TypeScript definitions
+  // Safe because Helvetica fonts are built into PDF standard and always available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const font = await (pdfDoc as any).embedFont('Helvetica');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -236,13 +336,59 @@ async function addTitlePage(
     font: boldFont,
   });
 
+  let yPosition = height - 160;
+
+  // Draw warnings if any
+  if (warnings.length > 0) {
+    page.drawText("⚠ Compilation Warnings", {
+      x: 50,
+      y: yPosition,
+      size: 12,
+      font: boldFont,
+    });
+    yPosition -= 20;
+
+    // Display up to 5 warnings on title page
+    const displayWarnings = warnings.slice(0, 5);
+    for (const warning of displayWarnings) {
+      const warningLines = wrapText(warning, font, 10, width - 100);
+      for (const line of warningLines) {
+        page.drawText(`• ${line}`, {
+          x: 50,
+          y: yPosition,
+          size: 10,
+          font: font,
+        });
+        yPosition -= 14;
+
+        if (yPosition < PAGE_BOTTOM_MARGIN + 200) break; // Reserve space for description
+      }
+    }
+
+    if (warnings.length > 5) {
+      page.drawText(
+        `... and ${warnings.length - 5} more warning(s). See logs for details.`,
+        {
+          x: 50,
+          y: yPosition,
+          size: 10,
+          font: font,
+        }
+      );
+      yPosition -= 14;
+    }
+
+    yPosition -= 20; // Extra spacing before description
+  }
+
   // Draw description label
   page.drawText("Description", {
     x: 50,
-    y: height - 160,
+    y: yPosition,
     size: 14,
     font: boldFont,
   });
+  yPosition -= 30;
 
   // Draw description (simplified - just raw text without markdown formatting)
   // For a production system, you'd want to parse markdown and render it properly
@@ -253,9 +399,12 @@ async function addTitlePage(
     width - 100
   );
 
-  let yPosition = height - 190;
-  for (const line of descriptionLines.slice(0, 30)) {
-    // Limit to 30 lines
+  const maxDescriptionLines = Math.max(
+    5,
+    Math.floor((yPosition - PAGE_BOTTOM_MARGIN - 50) / 18)
+  ); // Dynamic line limit based on available space
+
+  for (const line of descriptionLines.slice(0, maxDescriptionLines)) {
     page.drawText(line, {
       x: 50,
       y: yPosition,
@@ -264,7 +413,7 @@ async function addTitlePage(
     });
     yPosition -= 18;
 
-    if (yPosition < 50) break; // Don't overflow the page
+    if (yPosition < PAGE_BOTTOM_MARGIN + 50) break; // Don't overflow the page
   }
 
   // Add footer
@@ -283,10 +432,14 @@ async function addTableOfContents(
   pdfDoc: PDFDocument,
   entries: { title: string; page: number; source: string }[]
 ) {
+  // Type assertion needed: PDFPage type definition doesn't include all methods available at runtime
+  // This is safe because addPage() returns a valid PDFPage object with drawing methods
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = pdfDoc.addPage([612, 792]) as any; // US Letter size
   const { width, height } = page.getSize();
 
+  // Type assertion needed: embedFont() exists at runtime but is not in pdf-lib's TypeScript definitions
+  // Safe because Helvetica fonts are built into PDF standard and always available
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const font = await (pdfDoc as any).embedFont('Helvetica');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -308,7 +461,7 @@ async function addTableOfContents(
   const lineHeight = 20;
 
   for (const entry of entries) {
-    if (yPosition < 50) break; // Don't overflow the page
+    if (yPosition < PAGE_BOTTOM_MARGIN) break; // Don't overflow the page
 
     // Draw filename
     const truncatedTitle =
@@ -375,6 +528,75 @@ function wrapText(
   }
 
   return lines;
+}
+
+/**
+ * Add PDF bookmarks/outlines for navigation
+ */
+async function addBookmarks(
+  pdfDoc: PDFDocument,
+  bookmarks: { title: string; pageIndex: number }[]
+) {
+  // Type assertions needed: Accessing pdf-lib's low-level API for bookmark/outline creation
+  // The context and catalog properties exist at runtime but are not exposed in TypeScript types
+  // This is safe because we're using documented pdf-lib internal APIs for advanced features
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const context = (pdfDoc as any).context;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const catalog = (pdfDoc as any).catalog;
+
+  // Create outline dictionary
+  const outlineRef = context.nextRef();
+  const outlineDict = context.obj({
+    Type: "Outlines",
+    Count: bookmarks.length,
+  });
+
+  // Pre-allocate all outline item refs
+  const outlineItemRefs = bookmarks.map(() => context.nextRef());
+
+  // Type assertion needed: getPages() is not in public TypeScript API but exists at runtime
+  // Safe because we're working with the internal page array for bookmark destination references
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pages = (pdfDoc as any).getPages();
+
+  // Create outline items
+  const outlineItemDicts = bookmarks.map((bookmark, i) => {
+    const page = pages[bookmark.pageIndex];
+    // Type assertion needed: Access internal page reference for PDF destination linking
+    // Safe because every PDFPage object has a ref property for internal PDF object references
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pageRef = (page as any).ref;
+
+    return context.obj({
+      Title: context.obj(bookmark.title),
+      Parent: outlineRef,
+      Prev: i > 0 ? outlineItemRefs[i - 1] : undefined,
+      Next: i < bookmarks.length - 1 ? outlineItemRefs[i + 1] : undefined,
+      Dest: [pageRef, "XYZ", null, null, null],
+    });
+  });
+
+  // Update outline dictionary with first and last items
+  if (outlineItemRefs.length > 0) {
+    outlineDict.set(
+      context.obj("First"),
+      outlineItemRefs[0]
+    );
+    outlineDict.set(
+      context.obj("Last"),
+      outlineItemRefs[outlineItemRefs.length - 1]
+    );
+  }
+
+  // Register outline and items in context
+  context.assign(outlineRef, outlineDict);
+  outlineItemRefs.forEach((ref, i) => {
+    context.assign(ref, outlineItemDicts[i]);
+  });
+
+  // Add outline to catalog
+  catalog.set(context.obj("Outlines"), outlineRef);
 }
 
 // Add OPTIONS handler for CORS if needed

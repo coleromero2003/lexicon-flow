@@ -159,7 +159,6 @@ All database operations go through a service layer ([lib/services.ts](lib/servic
 - **stepService** - Step management
 - **objectService** - SCADA object management
 - **objectRelationService** - Relationship management
-- **objectSubtaskService** - Subtask management
 - **fileService** - File metadata
 - **objectFileService** - Object-file links
 - **objectLexiconService** - Object-lexicon links
