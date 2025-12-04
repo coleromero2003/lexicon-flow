@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Save merged PDF
-    const mergedPdfBytes = await mergedPdf.save();
+    const mergedPdfBytes = Buffer.from(await mergedPdf.save());
 
     // Generate filename
     const timestamp = Date.now();
