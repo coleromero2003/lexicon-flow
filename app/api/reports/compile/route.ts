@@ -277,8 +277,8 @@ export async function POST(req: NextRequest) {
     // Add bookmarks/outlines to the PDF
     await addBookmarks(mergedPdf, bookmarkData);
 
-    // Save merged PDF
-    const mergedPdfBytes = await mergedPdf.save();
+    // Save merged PDF (convert to Buffer so it's a valid BodyInit for NextResponse)
+    const mergedPdfBytes = Buffer.from(await mergedPdf.save());
 
     // Generate filename
     const filename = `compiled-${object.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
